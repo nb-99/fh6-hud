@@ -1,0 +1,30 @@
+﻿<Application x:Class="Fh6Hud.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Fh6Hud"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#E60F1722"/>
+        <SolidColorBrush x:Key="PanelBorderBrush" Color="#663D5267"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#B8293645"/>
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#663D5267"/>
+        <SolidColorBrush x:Key="DividerBrush" Color="#663D5267"/>
+        <SolidColorBrush x:Key="ProgressTrackBrush" Color="#66202B3A"/>
+        <SolidColorBrush x:Key="RedlineBrush" Color="#59FF5C5C"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#F2F6FA"/>
+        <SolidColorBrush x:Key="SecondaryBrush" Color="#C1CEDB"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#8796A8"/>
+        <SolidColorBrush x:Key="DimBrush" Color="#8796A8"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#39D0FF"/>
+        <SolidColorBrush x:Key="ColdBrush" Color="#4CB8FF"/>
+        <SolidColorBrush x:Key="OkBrush" Color="#50E3A4"/>
+        <SolidColorBrush x:Key="HotBrush" Color="#FF6B6B"/>
+        <SolidColorBrush x:Key="TireColdFillBrush" Color="#242F43"/>
+        <SolidColorBrush x:Key="TireOkFillBrush" Color="#203E3C"/>
+        <SolidColorBrush x:Key="TireHotFillBrush" Color="#482B34"/>
+        <SolidColorBrush x:Key="ReadyBrush" Color="#8796A8"/>
+        <SolidColorBrush x:Key="TimingBrush" Color="#FFC857"/>
+        <SolidColorBrush x:Key="DoneBrush" Color="#50E3A4"/>
+        <FontFamily x:Key="DigitFont">Consolas</FontFamily>
+    </Application.Resources>
+</Application>

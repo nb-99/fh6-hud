@@ -1,0 +1,6 @@
+{
+  "Port": 45000,
+  "TireCompound": "Race",
+  "TireOptMinC": 86.0,
+  "TireOptMaxC": 104.0
+}
