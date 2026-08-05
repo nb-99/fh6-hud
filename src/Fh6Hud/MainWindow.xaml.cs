@@ -270,6 +270,10 @@ public partial class MainWindow : Window
 
         if (w <= 0 || h <= 0 || buckets.Count == 0 || maxPower <= 0)
         {
+            // Nothing to draw yet (e.g. right after a car switch): clear the
+            // previous car's curve instead of leaving it on screen.
+            PowerCurveLine.Points = null;
+            PowerCurveDot.Visibility = Visibility.Collapsed;
             _powerCurve.IsDirty = false;
             return;
         }
