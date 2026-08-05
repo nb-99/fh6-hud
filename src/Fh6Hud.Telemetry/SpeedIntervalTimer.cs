@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Fh6Hud.Telemetry;
 
 /// <summary>
@@ -10,6 +8,11 @@ namespace Fh6Hud.Telemetry;
 /// small hysteresis band to ignore noise), and the best (minimum) elapsed time
 /// across completed runs is retained.
 /// </summary>
+/// <remarks>
+/// Elapsed time is derived from the packet <c>TimestampMs</c> field rather than
+/// a wall clock, so telemetry gaps (pauses, menus) cannot advance a running
+/// timer — a run simply holds until packets resume.
+/// </remarks>
 public sealed class SpeedIntervalTimer
 {
     public enum State
@@ -22,8 +25,8 @@ public sealed class SpeedIntervalTimer
     private readonly float _startKmh;
     private readonly float _reArmKmh;
     private readonly float _targetKmh;
-    private readonly Stopwatch _stopwatch = new();
     private float _previousSpeed = float.NaN;
+    private uint _startTimestampMs;
     private TimeSpan _finalTime;
     private TimeSpan _bestTime;
 
@@ -46,26 +49,30 @@ public sealed class SpeedIntervalTimer
 
     public string Label => $"{(int)_startKmh}-{(int)_targetKmh}";
 
-    public void Update(float speedKmh)
+    /// <summary>
+    /// Advances the state machine with a speed sample from a packet.
+    /// </summary>
+    /// <param name="speedKmh">Current speed in km/h.</param>
+    /// <param name="timestampMs">The packet's <c>TimestampMs</c> value.</param>
+    public void Update(float speedKmh, uint timestampMs)
     {
         switch (CurrentState)
         {
             case State.Waiting:
                 if (CrossedUpward(speedKmh, _startKmh))
                 {
-                    _stopwatch.Restart();
+                    _startTimestampMs = timestampMs;
+                    Elapsed = TimeSpan.Zero;
                     CurrentState = State.Running;
                 }
 
                 break;
 
             case State.Running:
-                Elapsed = _stopwatch.Elapsed;
+                Elapsed = ElapsedSince(_startTimestampMs, timestampMs);
                 if (speedKmh >= _targetKmh)
                 {
-                    _stopwatch.Stop();
-                    _finalTime = _stopwatch.Elapsed;
-                    Elapsed = _finalTime;
+                    _finalTime = Elapsed;
                     if (_bestTime == TimeSpan.Zero || _finalTime < _bestTime)
                     {
                         _bestTime = _finalTime;
@@ -92,6 +99,16 @@ public sealed class SpeedIntervalTimer
         _previousSpeed = speedKmh;
     }
 
+    /// <summary>
+    /// Elapsed time between two packet timestamps. Modular arithmetic keeps the
+    /// delta correct across the U32 wrap (TimestampMs overflows to 0 eventually).
+    /// </summary>
+    private static TimeSpan ElapsedSince(uint startMs, uint nowMs)
+    {
+        uint delta = unchecked(nowMs - startMs);
+        return TimeSpan.FromMilliseconds(delta);
+    }
+
     private bool CrossedUpward(float current, float threshold)
     {
         if (float.IsNaN(_previousSpeed))
@@ -104,7 +121,7 @@ public sealed class SpeedIntervalTimer
 
     public void Reset()
     {
-        _stopwatch.Reset();
+        _startTimestampMs = 0;
         _finalTime = default;
         Elapsed = default;
         CurrentState = State.Waiting;
