@@ -15,6 +15,12 @@ or modifying field handling.
 ## Key facts
 
 - Packet size: exactly **324 bytes**, all values **little-endian**.
+- The in-game **Data Out Packet Format** selector offers **Car Dash** (the
+  324-byte layout documented here) and **Sled** (a shorter ~232-byte packet:
+  a strict prefix subset ending at `NumCylinders`, with no speed, tire temps,
+  power, fuel, or gear). Receivers that validate 324 bytes (like this HUD)
+  silently drop Sled datagrams, so a Sled selection looks like no data at
+  all. Always use **Car Dash**.
 - Sent at the game's frame rate (up to ~60 Hz) — expect ~60 packets/sec.
 - Data is only sent **while the player is actively driving** (not in menus,
   pauses, replays, rewinds, or after finishing a race).
@@ -36,8 +42,9 @@ or modifying field handling.
 2. **Data Out IP Address** = 127.0.0.1 (same PC) or the receiving machine's IP.
 3. **Data Out IP Port** = match the app's listener; **avoid ports 5200-5300**
    (the game binds its own outgoing socket in that range).
-4. Firewall must allow inbound UDP on the chosen port.
-5. Data begins as soon as the player starts driving.
+4. **Data Out Packet Format** = **Car Dash** (NOT "Sled" — see key facts).
+5. Firewall must allow inbound UDP on the chosen port.
+6. Data begins as soon as the player starts driving.
 
 ## Parsing guidance
 
@@ -54,7 +61,8 @@ or modifying field handling.
 
 ## When the user says the HUD shows no data
 
-Walk through: Data Out toggle, IP/port match, port not in 5200-5300, firewall,
-packet length validation, and `IsRaceOn`/driving state (data only flows while
-driving). Suggest a raw UDP dump (`dotnet`/PowerShell one-liner or Wireshark)
-to confirm packets arrive at the expected port.
+Walk through: Data Out toggle, IP/port match, port not in 5200-5300, **Data
+Out Packet Format = Car Dash** (Sled is dropped), firewall, packet length
+validation, and `IsRaceOn`/driving state (data only flows while driving).
+Suggest a raw UDP dump (`dotnet`/PowerShell one-liner or Wireshark) to confirm
+packets arrive at the expected port.

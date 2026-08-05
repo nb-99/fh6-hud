@@ -42,8 +42,11 @@ over the game window.
    machine running the HUD.
 4. Set **Data Out IP Port** to `45000` (must match `config.json`). Avoid
    ports 5200–5300 — the game binds its own outgoing socket in that range.
-5. Allow inbound UDP on that port in Windows Firewall if prompted.
-6. Data is only streamed **while driving** — it stops in menus, replays,
+5. Set **Data Out Packet Format** to **Car Dash**. The shorter **Sled**
+   format is not supported: the HUD only accepts 324-byte packets, so a
+   Sled stream looks like "WAITING FOR TELEMETRY" forever.
+6. Allow inbound UDP on that port in Windows Firewall if prompted.
+7. Data is only streamed **while driving** — it stops in menus, replays,
    rewinds, and after finishing a race.
 
 ## Run the HUD
@@ -95,26 +98,28 @@ Vintage Race) and their optimal temperature ranges are defined in
 ## Repository layout
 
 ```
-src/Fh6Hud/                 WPF overlay app
-  Telemetry/Fh6Packet.cs    324-byte FH6 Data Out parser
-  Telemetry/UdpTelemetryListener.cs   UDP receiver (background thread)
-  Telemetry/SpeedIntervalTimer.cs     interval timer state machines
-  Telemetry/PowerCurveTracker.cs      power curve sampling
-  Telemetry/TireCompound.cs           compound presets
-  MainWindow.xaml(.cs)      HUD layout + rendering loop
-  HudConfig.cs / config.json
+src/Fh6Hud.Telemetry/       telemetry library (plain net10.0, no WPF)
+  Fh6Packet.cs              324-byte FH6 Data Out parser
+  UdpTelemetryListener.cs   UDP receiver (background thread)
+  SpeedIntervalTimer.cs     interval timer state machines
+  PowerCurveTracker.cs      power curve sampling
+  TireCompound.cs           compound presets
+  HudConfig.cs              config load/save (config.json)
+src/Fh6Hud/                 WPF overlay app (MainWindow.xaml/.cs, App.xaml)
 tools/Fh6Hud.Simulator/     synthetic telemetry generator (no game needed)
-tests/Fh6Hud.Tests/         unit tests (parser, timers, power curve)
+tests/Fh6Hud.Tests/         unit tests (parser, timers, power curve, config,
+                            compounds, UDP listener)
 docs/fh6-data-out.md        official FH6 Data Out spec snapshot
 .opencode/skills/           opencode skills (FH6 telemetry + WPF overlay)
 ```
 
 ## Troubleshooting
 
-- **No data / "WAITING FOR TELEMETRY"** — Data Out is off, the port doesn't
-  match, the game isn't driving (menu/pause), or a firewall blocks the port.
-  Verify packets arrive with a UDP dump (e.g. Wireshark filter
-  `udp.port == 45000`) or confirm the simulator flow works.
+- **No data / "WAITING FOR TELEMETRY"** — Data Out is off, **Data Out Packet
+  Format is set to "Sled" instead of "Car Dash"**, the port doesn't match,
+  the game isn't driving (menu/pause), or a firewall blocks the port. Verify
+  packets arrive with a UDP dump (e.g. Wireshark filter `udp.port == 45000`)
+  or confirm the simulator flow works.
 - **Tire temps look wrong** — FH6 sends tire temperature as Fahrenheit-like
   raw values; the HUD converts them to °C. The optimal range depends on the
   compound you select.
