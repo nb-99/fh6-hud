@@ -132,16 +132,18 @@ public partial class MainWindow : Window
         }
 
         bool stale = (DateTime.UtcNow - _lastPacketAt).TotalSeconds > StaleAfterSeconds;
-        SetText(SpeedText, $"{packet.SpeedKmh:F0}");
-        StatusDot.Fill = stale ? _hotBrush : _okBrush;
-        SpeedBarFill.Width = SpeedBarTrack.ActualWidth * Math.Clamp(packet.SpeedKmh / SpeedBarMaxKmh, 0f, 1f);
+        bool live = !stale && packet.IsRaceOn != 0;
 
-        if (stale)
+        if (!live)
         {
-            SetText(StatusText, "NO DATA  |  DRIVING?");
-            return;
+            ShowNoDataState(packet.IsRaceOn == 0 ? "FH6 // IN MENU" : "FH6 // NO DATA");
+            return; // timers hold: Update() is not called while there is no live data
         }
 
+        ShowLiveState();
+        SetText(SpeedText, $"{packet.SpeedKmh:F0}");
+        StatusDot.Fill = _okBrush;
+        SpeedBarFill.Width = SpeedBarTrack.ActualWidth * Math.Clamp(packet.SpeedKmh / SpeedBarMaxKmh, 0f, 1f);
         SetText(StatusText, $"UDP {_listener?.Port}  |  LIVE");
         UpdateTireTemp(TireFlCard, TireFl, TireFlState, packet.TireTempFrontLeftC);
         UpdateTireTemp(TireFrCard, TireFr, TireFrState, packet.TireTempFrontRightC);
@@ -178,6 +180,33 @@ public partial class MainWindow : Window
         UpdateIntervalRow(_timer0To100, T0_100_Time, T0_100_State);
         UpdateIntervalRow(_timer100To200, T100_200_Time, T100_200_State);
         UpdateIntervalRow(_timer200To300, T200_300_Time, T200_300_State);
+    }
+
+    private void ShowNoDataState(string message)
+    {
+        if (HudPanel.Visibility != Visibility.Collapsed)
+        {
+            HudPanel.Visibility = Visibility.Collapsed;
+        }
+
+        NoDataChipText.Text = message;
+        if (NoDataChip.Visibility != Visibility.Visible)
+        {
+            NoDataChip.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void ShowLiveState()
+    {
+        if (HudPanel.Visibility != Visibility.Visible)
+        {
+            HudPanel.Visibility = Visibility.Visible;
+        }
+
+        if (NoDataChip.Visibility != Visibility.Collapsed)
+        {
+            NoDataChip.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void UpdateIntervalRow(SpeedIntervalTimer timer, TextBlock timeBlock, TextBlock stateBlock)

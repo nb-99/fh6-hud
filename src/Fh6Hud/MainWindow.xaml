@@ -30,7 +30,8 @@
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Border x:Name="HudPanel"
+        <Grid>
+            <Border x:Name="HudPanel"
             Background="{StaticResource PanelBrush}"
             BorderBrush="{StaticResource PanelBorderBrush}"
             BorderThickness="1"
@@ -386,14 +387,40 @@
             </Grid>
 
             <Grid Margin="0,15,0,0">
-                <TextBlock Text="DATA OUT  |  60 HZ"
+                <TextBlock x:Name="FooterLeft"
+                           Text="DATA OUT  |  60 HZ"
                            Foreground="{StaticResource MutedBrush}"
                            FontSize="9"/>
-                <TextBlock Text="CTRL+ALT+H  CLICK-THROUGH"
+                <TextBlock x:Name="ClickThroughHint"
+                           Text="CTRL+ALT+H  CLICK-THROUGH"
                            HorizontalAlignment="Right"
                            Foreground="{StaticResource MutedBrush}"
                            FontSize="9"/>
             </Grid>
         </StackPanel>
-    </Border>
+        </Border>
+
+        <!-- Minimal status chip shown instead of the panel while there is no
+             live data (menu, garage, telemetry gap). Keeps the right-click
+             context menu reachable. -->
+        <Border x:Name="NoDataChip"
+                Visibility="Collapsed"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,16,16,0"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="16"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="7" Height="7" Fill="{StaticResource HotBrush}" Margin="0,0,7,0"/>
+                <TextBlock x:Name="NoDataChipText"
+                           Text="FH6 // NO DATA"
+                           Foreground="{StaticResource MutedBrush}"
+                           FontSize="10"
+                           FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+        </Grid>
 </Window>
