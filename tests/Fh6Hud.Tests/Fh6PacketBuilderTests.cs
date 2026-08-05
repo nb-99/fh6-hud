@@ -34,6 +34,21 @@ public class Fh6PacketBuilderTests
     }
 
     [Fact]
+    public void Build_ReturnsIndependentCopy()
+    {
+        var builder = new Fh6PacketBuilder().IsRaceOn(1).SpeedMs(27.78f);
+
+        var first = builder.Build();
+        first[0] = 99;
+
+        var second = builder.Build();
+        var packet = Fh6Packet.Parse(second);
+        Assert.NotNull(packet);
+        Assert.Equal(1, packet!.IsRaceOn);
+        Assert.Equal(27.78f, packet.SpeedMs);
+    }
+
+    [Fact]
     public void TireTempC_WritesFh6RawValueAndParsesBackToCelsius()
     {
         var bytes = new Fh6PacketBuilder()

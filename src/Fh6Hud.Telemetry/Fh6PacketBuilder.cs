@@ -71,7 +71,9 @@ public sealed class Fh6PacketBuilder
         return this;
     }
 
-    public byte[] Build() => _data;
+    /// <summary>Returns a copy of the packet so later builder mutations (or
+    /// caller-side edits of the returned buffer) cannot corrupt it.</summary>
+    public byte[] Build() => (byte[])_data.Clone();
 
     private void WriteI32(int offset, int value) =>
         BinaryPrimitives.WriteInt32LittleEndian(_data.AsSpan(offset), value);
