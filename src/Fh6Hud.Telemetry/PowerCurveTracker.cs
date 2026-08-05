@@ -46,6 +46,20 @@ public sealed class PowerCurveTracker
         _dirty = true;
     }
 
+    /// <summary>
+    /// Drops all sampled data and forgets the configured max RPM, so the next
+    /// <see cref="Configure"/> call re-initializes from scratch. Used on car
+    /// switch: two cars may share a redline, so <c>Configure</c> alone would
+    /// keep the previous car's curve.
+    /// </summary>
+    public void Reset()
+    {
+        _powerByBucket = Array.Empty<float>();
+        _maxRpm = 0;
+        _maxPowerW = 0;
+        _dirty = true;
+    }
+
     /// <summary>Records a sample. Returns true if a bucket peak increased.</summary>
     public bool AddSample(float rpm, float powerW)
     {
