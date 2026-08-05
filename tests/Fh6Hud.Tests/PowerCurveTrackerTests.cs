@@ -34,6 +34,25 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
+    public void Reset_ClearsCurve_EvenWhenMaxRpmUnchanged()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        tracker.AddSample(3000f, 200_000f);
+        Assert.Equal(200_000f, tracker.MaxPowerW);
+
+        tracker.Reset();
+        Assert.Equal(0f, tracker.MaxPowerW);
+        Assert.Equal(0, tracker.BucketCount);
+
+        // Reconfiguring with the same max RPM must reinitialize buckets —
+        // without Reset, Configure would early-return and keep old data.
+        tracker.Configure(7000f);
+        Assert.Equal(71, tracker.BucketCount);
+        Assert.Equal(0f, tracker.MaxPowerW);
+    }
+
+    [Fact]
     public void IgnoreSamplesBeforeConfigure()
     {
         var tracker = new PowerCurveTracker();

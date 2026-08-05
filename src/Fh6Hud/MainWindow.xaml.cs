@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private readonly SpeedIntervalTimer _timer200To300 = new(200f, 300f);
     private readonly PowerCurveTracker _powerCurve = new();
     private string _tireCompound = "Race";
+    private int _lastCarOrdinal = int.MinValue;
 
     private UdpTelemetryListener? _listener;
     private Fh6Packet? _latest;
@@ -153,6 +154,12 @@ public partial class MainWindow : Window
         RpmBarFill.Width = maxRpm > 0
             ? RpmBarTrack.ActualWidth * Math.Clamp(packet.CurrentEngineRpm / maxRpm, 0f, 1f)
             : 0;
+
+        if (packet.CarOrdinal != _lastCarOrdinal)
+        {
+            _lastCarOrdinal = packet.CarOrdinal;
+            _powerCurve.Reset();
+        }
 
         _powerCurve.Configure(maxRpm);
         _powerCurve.AddSample(packet.CurrentEngineRpm, packet.PowerWatts);
