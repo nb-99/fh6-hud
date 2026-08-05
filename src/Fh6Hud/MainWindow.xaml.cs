@@ -60,6 +60,11 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _config = HudConfig.Load();
+        if (_config.LoadFailed)
+        {
+            FooterLeft.Text = "CONFIG INVALID  |  USING DEFAULTS";
+        }
+
         _tireCompound = _config.TireCompound;
         ApplyCompound(TireCompound.Find(_tireCompound));
 
@@ -345,6 +350,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem item && item.Tag is string name)
         {
             ApplyCompound(TireCompound.Find(name));
+            _config.Save();
             StatusText.Text = $"TIRES {_tireCompound}  |  {_config.TireOptMinC:F0}-{_config.TireOptMaxC:F0} °C";
         }
     }

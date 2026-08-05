@@ -8,6 +8,8 @@ public sealed class HudConfig
 {
     public const string FileName = "config.json";
 
+    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
+
     /// <summary>UDP port the game sends Data Out packets to (avoid 5200-5300).</summary>
     public int Port { get; set; } = 45000;
 
@@ -22,6 +24,13 @@ public sealed class HudConfig
     [JsonIgnore]
     public string SourcePath { get; private set; } = "";
 
+    /// <summary>
+    /// True when the config file existed but could not be parsed; the app then
+    /// runs on defaults and should tell the user (see FUNC-5).
+    /// </summary>
+    [JsonIgnore]
+    public bool LoadFailed { get; private set; }
+
     public static HudConfig Load(string? path = null)
     {
         path ??= Path.Combine(AppContext.BaseDirectory, FileName);
@@ -33,12 +42,29 @@ public sealed class HudConfig
         try
         {
             var config = JsonSerializer.Deserialize<HudConfig>(File.ReadAllText(path));
-            config!.SourcePath = path;
+            if (config is null)
+            {
+                return new HudConfig { SourcePath = path, LoadFailed = true };
+            }
+
+            config.SourcePath = path;
             return config;
         }
         catch (JsonException)
         {
-            return new HudConfig { SourcePath = path };
+            return new HudConfig { SourcePath = path, LoadFailed = true };
         }
+    }
+
+    /// <summary>Writes the current values back to the config file (default: the loaded path).</summary>
+    public void Save(string? path = null)
+    {
+        path ??= SourcePath;
+        if (string.IsNullOrEmpty(path))
+        {
+            path = Path.Combine(AppContext.BaseDirectory, FileName);
+        }
+
+        File.WriteAllText(path, JsonSerializer.Serialize(this, SerializerOptions));
     }
 }
