@@ -11,6 +11,7 @@
         SizeToContent="Height"
         Width="560"
         WindowStartupLocation="Manual"
+        SizeChanged="OnWindowSizeChanged"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
     <Window.ContextMenu>
