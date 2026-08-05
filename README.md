@@ -79,12 +79,14 @@ on build — edit the copy in the output folder to affect a published build):
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `Port` | `45000` | UDP port the HUD listens on (must match the game) |
-| `TireCompound` | `Race` | Compound preset used for the optimal temp range |
-| `TireOptMinC` / `TireOptMaxC` | `86` / `104` | Manual optimal range override (°C) |
+| `TireCompound` | `Rally` | Compound preset used for the optimal temp range |
+| `TireOptMinC` / `TireOptMaxC` | `72` / `90` | Manual optimal range override (°C) |
 
-The tire compound can also be changed live via the HUD's right-click menu.
-Compound presets (Street / Sport / Race / Slick / Rally / Drag) and their
-optimal temperature ranges are defined in `src/Fh6Hud/Telemetry/TireCompound.cs`.
+The tire compound can also be changed live via the HUD's right-click menu
+(changes are saved back to `config.json`). Compound presets (Standard /
+Street / Sport / Rally / Semi-Slick / Slick / Offroad / Snow / Vintage /
+Vintage Race) and their optimal temperature ranges are defined in
+`src/Fh6Hud.Telemetry/TireCompound.cs`.
 
 > Note: FH6's Data Out packet does **not** include the equipped tire compound,
 > so it must be selected manually. The preset ranges are editable starting

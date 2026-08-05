@@ -16,12 +16,16 @@
     <Window.ContextMenu>
         <ContextMenu>
             <MenuItem Header="Tire compound" x:Name="TireCompoundMenu">
+                <MenuItem Header="Standard" Tag="Standard" IsCheckable="True" Click="Compound_Click"/>
                 <MenuItem Header="Street" Tag="Street" IsCheckable="True" Click="Compound_Click"/>
                 <MenuItem Header="Sport" Tag="Sport" IsCheckable="True" Click="Compound_Click"/>
-                <MenuItem Header="Race" Tag="Race" IsCheckable="True" Click="Compound_Click"/>
-                <MenuItem Header="Slick" Tag="Slick" IsCheckable="True" Click="Compound_Click"/>
                 <MenuItem Header="Rally" Tag="Rally" IsCheckable="True" Click="Compound_Click"/>
-                <MenuItem Header="Drag" Tag="Drag" IsCheckable="True" Click="Compound_Click"/>
+                <MenuItem Header="Semi-Slick" Tag="Semi-Slick" IsCheckable="True" Click="Compound_Click"/>
+                <MenuItem Header="Slick" Tag="Slick" IsCheckable="True" Click="Compound_Click"/>
+                <MenuItem Header="Offroad" Tag="Offroad" IsCheckable="True" Click="Compound_Click"/>
+                <MenuItem Header="Snow" Tag="Snow" IsCheckable="True" Click="Compound_Click"/>
+                <MenuItem Header="Vintage" Tag="Vintage" IsCheckable="True" Click="Compound_Click"/>
+                <MenuItem Header="Vintage Race" Tag="Vintage Race" IsCheckable="True" Click="Compound_Click"/>
             </MenuItem>
             <MenuItem Header="Reset all timers" Click="ResetTimers_Click"/>
             <MenuItem Header="Click-through (pass input to game)" Click="ToggleClickThrough_Click"/>
