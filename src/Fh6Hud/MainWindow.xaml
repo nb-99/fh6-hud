@@ -69,6 +69,21 @@
                                    FontWeight="SemiBold"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,7,0,0">
+                        <Border x:Name="GearChip"
+                                Background="{StaticResource CardBrush}"
+                                BorderBrush="{StaticResource CardBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="9,5"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,10,4">
+                            <TextBlock x:Name="GearText"
+                                       Text="--"
+                                       FontFamily="{StaticResource DigitFont}"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource AccentBrush}"/>
+                        </Border>
                         <TextBlock x:Name="SpeedText"
                                    Text="--"
                                    FontFamily="{StaticResource DigitFont}"

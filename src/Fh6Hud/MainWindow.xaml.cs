@@ -147,6 +147,7 @@ public partial class MainWindow : Window
 
         ShowLiveState();
         SetText(SpeedText, $"{packet.SpeedKmh:F0}");
+        SetText(GearText, GearLabel(packet.Gear));
         StatusDot.Fill = _okBrush;
         SpeedBarFill.Width = SpeedBarTrack.ActualWidth * Math.Clamp(packet.SpeedKmh / SpeedBarMaxKmh, 0f, 1f);
         SetText(StatusText, $"UDP {_listener?.Port}  |  LIVE");
@@ -303,13 +304,13 @@ public partial class MainWindow : Window
         {
             stateBrush = _coldBrush;
             fillBrush = _coldFillBrush;
-            state = "COLD";
+            state = $"COLD {tempC - _config.TireOptMinC:+0;-0;0}°";
         }
         else if (tempC > _config.TireOptMaxC)
         {
             stateBrush = _hotBrush;
             fillBrush = _hotFillBrush;
-            state = "HOT";
+            state = $"HOT {tempC - _config.TireOptMaxC:+0;-0;0}°";
         }
         else
         {
@@ -362,6 +363,20 @@ public partial class MainWindow : Window
             block.Text = text;
         }
     }
+
+    /// <summary>
+    /// Maps the raw gear byte to a display label. 0 = neutral, 20 = reverse,
+    /// 21 = drive (D), 22 = park (P) — inherited from earlier Forza titles;
+    /// verify against live FH6 data before relying on these values.
+    /// </summary>
+    private static string GearLabel(byte gear) => gear switch
+    {
+        0 => "N",
+        20 => "R",
+        21 => "D",
+        22 => "P",
+        _ => gear.ToString(),
+    };
 
     private void Panel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
