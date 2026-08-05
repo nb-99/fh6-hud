@@ -1,9 +1,9 @@
 # FH6 HUD — Improvement Backlog
 
 Proposed improvements from a full review of the repo (UI, functionality,
-architecture, testing, telemetry data). **How to use:** tick the checkbox of
-every item you want implemented (`- [x]`), then hand the file back — the
-checked items become the work backlog. Unchecked items stay proposals.
+architecture, testing, telemetry data). Checked items (`- [x]`) are the agreed
+work backlog; unchecked items are declined or deferred proposals (decision
+noted inline).
 
 Items are tagged with effort: **S** = small (< half a day), **M** = medium
 (1–2 days), **L** = large (multi-day refactor). "Depends on" lists items that
@@ -13,83 +13,84 @@ must land first.
 > the repo source and the official FH6 Data Out spec (`docs/fh6-data-out.md`);
 > community-sourced facts are marked `[SRC]`. Tire ranges are approximations —
 > FH6 does not expose the equipped compound over Data Out.
+>
+> Selection walkthrough completed 2026-08-05: every item reviewed against the
+> current source; decisions recorded below.
 
 ---
 
 ## Tires & telemetry data
 
-- [ ] **DATA-1 — Car identity from `CarOrdinal`** *(M)*
-  - The packet's `CarOrdinal` (S32 @ 212, parsed but unused) can be mapped to
-    car make/model via community databases (`[SRC]`: HDR's FH6 ordinals gist,
-    Nexus mods "FH6 Car ID List" CSV/JSON).
-  - Ship a local lookup table → show the car name in the HUD header and detect
-    car switches. Car-switch detection fixes the power-curve reset bug (today
-    the curve only resets when `EngineMaxRpm` changes, so two cars sharing a
-    redline keep the previous car's curve — see FUNC-3).
-  - Deliverable: `CarDatabase` (embedded CSV), name in header, `CarOrdinal`
-    change event.
+- [x] **DATA-1 — Car-switch detection via `CarOrdinal`** *(S, rescoped)*
+  - Decision: switch detection only — **no car-name database** (community CSVs
+    are unlicensed, high-maintenance, and the car name adds no HUD value).
+  - `CarOrdinal` (S32 @ 212, parsed but unused): on change, reset
+    `PowerCurveTracker` (fixes FUNC-3) and any per-car cached state. Power
+    curve accumulates per car; a new ordinal starts a fresh curve.
 
-- [ ] **DATA-2 — Complete tire compound set** *(S)*
-  - The context menu (`MainWindow.xaml`) offers only Street / Sport / Race /
-    Slick / Rally / Drag. FH6 also has Stock, Snow and Offroad compounds.
-  - Add missing presets in `TireCompound.cs`. Community observations:
-    stock tires run best ~180–195 °F (82–91 °C) `[SRC]` — consider making
-    Stock the default instead of Race.
+- [x] **DATA-2 — Complete tire compound set** *(S, rescoped)*
+  - Presets (**default = Rally**): Rally, Semi-Slick, Slick, Offroad, Snow,
+    Street, Sport, Standard, Vintage, Vintage Race.
+  - Supply community-observed optimal ranges, marked as approximations `[SRC]`
+    — FH6 does not expose the equipped compound over Data Out, so selection
+    stays manual.
+  - Update `Telemetry/TireCompound.cs` + context menu (`MainWindow.xaml`).
 
 - [ ] **DATA-3 — °F / °C display toggle** *(S)*
-  - Raw FH6 tire values are Fahrenheit-like; the in-game telemetry and the
-    tuning community talk °F. Add a config/menu option that switches the tire
-    card (and the TARGET range readout) between units.
+  - **Declined:** HUD stays °C-only.
 
-- [ ] **DATA-4 — Document the Data Out "Format" setting** *(S)*
-  - FH6's Data Out has a packet **Format selector: "Car Dash" vs "Sled"**
-    `[SRC]` (satyajiit/forza-horizon-6-moza-bridge README). "Sled" sends a
-    shorter packet that the listener silently drops (length != 324), which
-    looks like "WAITING FOR TELEMETRY" forever.
+- [x] **DATA-4 — Document the Data Out "Format" setting** *(S)*
+  - Sled is a strict prefix subset of Car Dash (ends at `NumCylinders`,
+    ~232 bytes): RPM, motion, suspension, slip, car identity. It has **no**
+    speed, tire temps, power, fuel, or gear — nothing this HUD uses.
+  - Selection is in-game: SETTINGS > HUD AND GAMEPLAY > Data Out Packet
+    Format = **Car Dash** `[SRC]` (the official FH6 article omits the
+    selector).
   - Add "Format = Car Dash" to the README in-game setup + troubleshooting
-    tables, and to `.opencode/skills/fh6-data-out/SKILL.md`.
+    tables and to the fh6-data-out skill; symptom of Sled: permanent
+    "WAITING FOR TELEMETRY" (the listener silently drops datagrams != 324
+    bytes).
 
 - [ ] **DATA-5 — Verify FH5 vs FH6 layout claim in docs** *(S)*
-  - `docs/fh6-data-out.md` claims FH6 shifted fields +12 bytes vs FH5. A
-    community bridge reports FH6 Car Dash is byte-identical to FH5 `[SRC]`.
-    Both are community claims; the HUD follows the official FH6 article
-    (correct), but verify with a live capture before ever adding FH5 support.
+  - **Declined:** FH6-only scope.
 
 ---
 
 ## UI
 
 - [ ] **UI-1 — Live packet rate + error count in footer** *(S)*
-  - Footer hardcodes "DATA OUT | 60 HZ". `UdpTelemetryListener` already counts
-    `PacketsReceived` / `ReceiveErrors` — show a measured Hz (delta over 1 s)
-    and surface receive errors, which are currently invisible.
+  - **Declined:** a permanent Hz readout spends screen space on a rare
+    diagnostic. The existing stale status ("NO DATA | DRIVING?") already
+    covers broken input. Counters stay available in `UdpTelemetryListener`
+    if ever needed.
 
-- [ ] **UI-2 — Gear, boost, fuel, torque readouts** *(S)*
-  - `Gear`, `BoostPsi`, `Fuel`, `TorqueNm` are parsed but never rendered.
-    A gear chip next to the speed readout is the highest-value add; boost/fuel
-    under the engine card; torque next to the power values.
+- [x] **UI-2 — Gear readout** *(S, rescoped)*
+  - Gear chip next to the speed readout. Mapping (0=N, 20=R, 21=D, 22=P) is
+    inferred from earlier titles — verify against live data before shipping.
+  - Boost/fuel/torque **declined for now** (panel space); revisit if panels
+    become customizable.
 
-- [ ] **UI-3 — Per-tire delta vs optimal window** *(S)*
+- [x] **UI-3 — Per-tire delta vs optimal window** *(S)*
   - Tire card is only 3-state color (cold / in range / hot). Show how far a
-    tire is off target (e.g. "+8° above target") — that is what tuning
-    actually reacts to. Optional polish: a tick showing where the optimal band
-    sits on the temperature scale.
+    tire is off target (e.g. "HOT +8°") in the existing state slot — that is
+    what tuning actually reacts to.
 
 - [ ] **UI-4 — Auto-scaling speed bar** *(S)*
-  - Speed bar is fixed 0–300 km/h (`SpeedBarMaxKmh`), useless for cars that
-    top out at 260. Auto-scale to sampled max speed or car-derived top speed.
+  - **Postponed:** bar stays fixed 0–300 km/h (matches the timer zones); the
+    speed number is already uncapped. The bar's value is marginal — revisit
+    only if it earns its space, otherwise consider deleting it.
 
-- [ ] **UI-5 — Click-through affordance** *(S)*
+- [x] **UI-5 — Click-through affordance** *(S)*
   - When click-through is active, right-click passes to the game — the footer
     hint is the only way back. Toggle the footer text to
     "CTRL+ALT+H TO RESTORE" while click-through is on.
 
-- [ ] **UI-6 — Hotkey registration failure handling** *(S)*
+- [x] **UI-6 — Hotkey registration failure handling** *(S)*
   - `RegisterHotKey` return value is ignored (`MainWindow.xaml.cs`). If
-    Ctrl+Alt+H is taken by another app the toggle silently dies. Log the
-    failure, retry with a fallback hotkey, or surface it in the footer.
+    Ctrl+Alt+H is taken by another app the toggle silently dies. Surface the
+    failure in the footer/status line.
 
-- [ ] **UI-7 — Window position re-anchor** *(S)*
+- [x] **UI-7 — Window position re-anchor** *(S)*
   - Position is set once in `OnLoaded` from `ActualHeight`; with
     `SizeToContent=Height` layout may not be final. Re-anchor on
     `SizeChanged` to avoid the window drifting from the corner.
@@ -98,99 +99,101 @@ must land first.
 
 ## Functionality
 
-- [ ] **FUNC-1 — Hold interval timers during telemetry gaps** *(M)*
-  - *Bug.* `SpeedIntervalTimer` runs a real `Stopwatch`; `Update()` is only
-    called while packets arrive, and the render loop returns early when data
-    goes stale. A game pause/menu therefore keeps the clock running and a
-    0–100 run can "complete" with an inflated time when data resumes.
-  - Fix: freeze/hold timers while `stale`, or cap elapsed to the packet gap.
-    Needs timer tests (see TEST-2).
+- [x] **FUNC-1 — Hold interval timers during telemetry gaps** *(M)*
+  - *Bug.* `SpeedIntervalTimer` runs a wall-clock `Stopwatch`; `Update()` is
+    only called while packets arrive, so a pause/menu mid-run inflates the
+    time when data resumes.
+  - **Fix approach:** drive elapsed from packet `TimestampMs` (U32 @ 4,
+    parsed but unused) instead of a wall clock — gaps then cannot advance
+    the timer by construction.
+  - Add timer tests feeding synthetic timestamps (supersedes TEST-2).
 
-- [ ] **FUNC-2 — Gate rendering on `IsRaceOn`** *(S)*
-  - `IsRaceOn` is parsed but ignored. A packet with `IsRaceOn = 0` (race
-    stopped) renders as live data. Gate the render path on it alongside the
-    existing staleness check.
+- [x] **FUNC-2 — Gate rendering on `IsRaceOn`** *(S, rescoped)*
+  - When `IsRaceOn == 0` (menu/garage/stopped): hide the HUD panel but keep
+    a minimal status chip visible — hiding everything would remove the
+    right-click target and strand the context menu.
+  - Treat as one "no live data" state together with the stale path; timers
+    hold via FUNC-1. (In menus the game usually stops sending entirely, so
+    staleness covers most cases; `IsRaceOn` adds finish/replay/paused states
+    where packets keep flowing.)
 
-- [ ] **FUNC-3 — Reset power curve on car change** *(S)*
+- [x] **FUNC-3 — Reset power curve on car change** *(S)*
   - `PowerCurveTracker` resets only when `EngineMaxRpm` changes; two cars with
-    the same redline keep the old curve. Reset on `CarOrdinal` change (see
-    DATA-1). Also fold the public `IsDirty` setter into the tracker
-    (`TryGetPendingCurve`-style) so the state machine is honest.
+    the same redline keep the old curve. Reset on `CarOrdinal` change
+    (see DATA-1).
 
-- [ ] **FUNC-4 — Persist config changes** *(S)*
+- [x] **FUNC-4 — Persist config changes** *(S)*
   - `ApplyCompound` mutates the in-memory config but `HudConfig` has no
-    `Save()` — compound/range changes made via the menu are lost on restart.
-    Add save-on-change writing `config.json`.
+    `Save()` — menu changes are lost on restart. Add save-on-change writing
+    `config.json`.
+  - Scope: persist all fields (compound, range, port) **except** window
+    position (the corner anchor is by design, not user state). Note:
+    `HudConfig.Load` already honors a hand-edited `config.json` today;
+    this closes the loop for in-app changes.
 
-- [ ] **FUNC-5 — Surface invalid config** *(S)*
+- [x] **FUNC-5 — Surface invalid config** *(S)*
   - `HudConfig.Load` silently falls back to defaults on malformed JSON. Show a
-    status-line warning ("CONFIG INVALID, USING DEFAULTS") instead of
-    surprising the user with different behavior.
+    status-line warning ("CONFIG INVALID, USING DEFAULTS").
 
 - [ ] **FUNC-6 — Simulator cold-start temps** *(S)*
-  - The `cruise` scenario starts tires at 60 °C (`Fh6Hud.Simulator/Program.cs`),
-    so the COLD state never appears. Start below the lower bound (e.g. 40 °C)
-    so the whole color spectrum is exercisable during development.
+  - **Declined:** premise was wrong — cruise starts at ~60 °C, which is below
+    every preset's minimum, so the COLD state already appears and the sim
+    warms through the full spectrum.
 
-- [ ] **FUNC-7 — `Fh6PacketBuilder.Build()` defensive copy** *(S)*
+- [x] **FUNC-7 — `Fh6PacketBuilder.Build()` defensive copy** *(S)*
   - `Build()` returns the internal buffer; mutation after build corrupts
-    subsequent packets. Return a copy or document single-use.
+    subsequent packets. Return a copy.
 
 ---
 
 ## Architecture
 
-- [ ] **ARCH-1 — Extract `Fh6Hud.Telemetry` class library** *(M)*
+- [x] **ARCH-1 — Extract `Fh6Hud.Telemetry` class library** *(M)*
   - The simulator and the test project both reference the WPF `WinExe`,
     dragging WPF into the test host and tying the tool to Windows.
-  - Move `Telemetry/` into a plain `net10.0` library. Effects:
-    - parser/timer/config tests run on **any OS** → enables Linux CI (CI-1),
+  - Move `Telemetry/` (and `HudConfig`) into a plain `net10.0` library.
+    Effects:
+    - parser/timer/config tests run on **any OS** → enables the Linux CI
+      follow-up (CI-1),
     - clean `MainWindow` ↔ `Telemetry` boundary.
-  - *Depends on:* nothing. *Enables:* CI-1.
+  - *Depends on:* nothing. *Enables:* CI-1 (ubuntu job), TEST-1/3/4 on Linux.
 
 - [ ] **ARCH-2 — Extract `HudPresenter` from `MainWindow`** *(L)*
-  - `MainWindow.xaml.cs` is a 386-line god object mixing P/Invoke window
-    chrome, hotkey handling, telemetry rendering, compound menu and config.
-  - Move the render pipeline (frame → UI state: temp classification,
-    formatting, interval rows, power curve updates) into a testable
-    `HudPresenter`; the window keeps chrome, hotkey and input only.
-  - *Depends on:* nothing. *Enables:* TEST-5.
+  - **Deferred:** the stateful logic (`PowerCurveTracker`,
+    `SpeedIntervalTimer`) is already extracted and tested; what remains in
+    `MainWindow` is mostly formatting. Refactor only if the UI keeps growing
+    (e.g. customizable panels) — record this decision in a short architecture
+    note (README or docs) for future work.
 
 ---
 
 ## Testing & CI
 
-- [ ] **TEST-1 — `UdpTelemetryListener` loopback tests** *(M)*
-  - Zero coverage today. Testable with real loopback UDP: bind port 0, send
-    crafted 324-byte packets, assert `PacketReceived` + counters, and that
-    non-324 datagrams are ignored (pins the Sled-format failure mode).
+- [x] **TEST-1 — `UdpTelemetryListener` loopback tests** *(M)*
+  - Zero coverage today. Real loopback UDP: bind port 0, send crafted
+    324-byte packets, assert `PacketReceived` + counters, and that non-324
+    datagrams are ignored (pins the Sled-format failure mode). Tests real
+    socket behavior, not mocks.
 
 - [ ] **TEST-2 — `TimeProvider` injection for timer tests** *(M)*
-  - `SpeedIntervalTimerTests` sleeps real milliseconds against a real
-    `Stopwatch` — slow and potentially flaky. Inject `TimeProvider` (built-in
-    since .NET 8) with a fake clock; tests become instant and deterministic.
-  - *Depends on:* FUNC-1 touches the same state machine — do both together.
+  - **Declined:** superseded by FUNC-1's `TimestampMs` approach — timer tests
+    feed synthetic packet timestamps, so they are instant and deterministic
+    without a fake clock.
 
-- [ ] **TEST-3 — `HudConfig` tests** *(S)*
-  - Missing file → defaults, malformed JSON → defaults, valid round-trip,
-    `SourcePath` set.
+- [x] **TEST-3 — `HudConfig` tests** *(S)*
+  - Missing file → defaults, malformed JSON → defaults + invalid flag
+    (FUNC-5), valid round-trip including `Save()` (FUNC-4), `SourcePath` set.
 
-- [ ] **TEST-4 — `TireCompound` tests** *(S)*
+- [x] **TEST-4 — `TireCompound` tests** *(S)*
   - `Find` case-insensitivity, unknown → null, preset sanity (min < max),
-    complete compound set present (ties into DATA-2).
+    the complete 10-compound set present, default = Rally (pins DATA-2).
 
 - [ ] **TEST-5 — Presenter/render-pipeline tests** *(M)*
-  - The largest untested chunk is the render path in `MainWindow`. Once
-    ARCH-2 lands, test temp-state boundaries (exactly at min/max → IN RANGE),
-    stale-path behavior, and formatting.
-  - *Depends on:* ARCH-2.
+  - **Declined for now:** depends on ARCH-2, which is deferred.
 
 - [x] **CI-1 — GitHub Actions workflow** *(S, done)*
   - **Implemented:** `.github/workflows/ci.yml` runs `dotnet test
-    Fh6Hud.slnx` on `windows-latest` for every push to `main` and PR. A
-    Windows runner is required: the test project references the WPF
-    `net10.0-windows` app, which only builds on Windows. Tests are headless
-    (xUnit, no window instantiation), so they run normally on the runner.
+    Fh6Hud.slnx` on `windows-latest` for every push to `main` and PR.
   - **Follow-up (after ARCH-1):** add a fast `ubuntu-latest` job for
     parser/timer/config tests once `Fh6Hud.Telemetry` is a plain `net10.0`
     library; keep the Windows job for the full solution.
@@ -198,20 +201,22 @@ must land first.
 
 ---
 
-## Suggested order
+## Agreed implementation order
 
-1. **Quick wins (bug-adjacent, independent):** FUNC-1, FUNC-2, FUNC-3,
-   FUNC-4, DATA-4, FUNC-6, FUNC-7
-2. **Cheap & visible:** UI-1, UI-2, UI-3, DATA-2, DATA-3, FUNC-5
-3. **Structural (unlock CI + pipeline tests):** ARCH-1 → CI-1, TEST-1,
-   TEST-2, TEST-3, TEST-4 → then ARCH-2 → TEST-5
-4. **Polish:** UI-4, UI-5, UI-6, UI-7, DATA-1 (car identity can move up if
-   the CSV is sourced early), DATA-5
+1. **Quick wins (bugs + hygiene):** FUNC-1 (TimestampMs timers), FUNC-3 +
+   DATA-1 (ordinal reset), FUNC-2 (IsRaceOn gating), FUNC-4, FUNC-5, FUNC-7,
+   DATA-4 (docs)
+2. **Visible:** UI-2 (gear), UI-3 (tire delta), UI-5, UI-6, UI-7, DATA-2
+   (compound set)
+3. **Structural + tests:** ARCH-1 → CI-1 ubuntu follow-up, TEST-1, TEST-3,
+   TEST-4
+4. **Deferred/declined:** ARCH-2 + TEST-5 (revisit if the UI grows), UI-4
+   (revisit or delete the bar), DATA-3, DATA-5, UI-1, FUNC-6, TEST-2
 
-## Open questions for selection
+## Resolved decisions (was: open questions)
 
-- Should the car-name database (DATA-1) ship **embedded** in the repo
-  (offline, ~900 entries, needs license note from the CSV source) or be
-  **downloaded** on first run?
-- Should FUNC-4 persist only the compound/range, or all config including the
-  window position and °F/°C unit (DATA-3)?
+- **Car-name database:** dropped. Only ordinal-change detection ships; the
+  power curve is cached per `CarOrdinal` and reset on change.
+- **Config persistence:** persist all fields except window position.
+  `HudConfig.Load` already supports a user-supplied `config.json`; FUNC-4
+  adds `Save()` so in-app changes persist to the same file.
