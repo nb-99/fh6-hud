@@ -14,12 +14,12 @@ public sealed class HudConfig
     public int Port { get; set; } = 45000;
 
     /// <summary>Selected tire compound preset name (see Telemetry/TireCompound.cs).</summary>
-    public string TireCompound { get; set; } = "Race";
+    public string TireCompound { get; set; } = "Rally";
 
     /// <summary>Optimal tire operating temperature range in °C. Below = cold, above = hot.</summary>
-    public float TireOptMinC { get; set; } = 86f;
+    public float TireOptMinC { get; set; } = 72f;
 
-    public float TireOptMaxC { get; set; } = 104f;
+    public float TireOptMaxC { get; set; } = 90f;
 
     [JsonIgnore]
     public string SourcePath { get; private set; } = "";

@@ -1,6 +1,6 @@
 {
   "Port": 45000,
-  "TireCompound": "Race",
-  "TireOptMinC": 86.0,
-  "TireOptMaxC": 104.0
+  "TireCompound": "Rally",
+  "TireOptMinC": 72.0,
+  "TireOptMaxC": 90.0
 }
