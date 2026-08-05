@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private Fh6Packet? _latest;
     private DateTime _lastPacketAt = DateTime.MinValue;
     private bool _clickThrough;
+    private bool _userMoved;
     private HwndSource? _hwndSource;
 
     private readonly SolidColorBrush _coldBrush;
@@ -89,9 +90,7 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var work = SystemParameters.WorkArea;
-        Left = work.Left + 16;
-        Top = work.Bottom - ActualHeight - 16;
+        AnchorToCorner();
 
         _hwndSource = (HwndSource?)PresentationSource.FromVisual(this);
         _hwndSource?.AddHook(WndProc);
@@ -107,8 +106,31 @@ public partial class MainWindow : Window
             StatusText.Text = $"PORT {_config.Port} UNAVAILABLE";
         }
 
-        RegisterHotKey(_hwndSource?.Handle ?? IntPtr.Zero, HotkeyId, ModControlAlt, (uint)'H');
+        bool hotkeyOk = RegisterHotKey(_hwndSource?.Handle ?? IntPtr.Zero, HotkeyId, ModControlAlt, (uint)'H');
+        if (!hotkeyOk)
+        {
+            ClickThroughHint.Text = "CTRL+ALT+H  UNAVAILABLE";
+        }
+
         CompositionTarget.Rendering += OnRendering;
+    }
+
+    private void OnWindowSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        // SizeToContent=Height means the height (and thus the corner anchor)
+        // is not final during OnLoaded; re-anchor once layout settles, but
+        // never fight a user who has dragged the window elsewhere.
+        if (e.HeightChanged && !_userMoved)
+        {
+            AnchorToCorner();
+        }
+    }
+
+    private void AnchorToCorner()
+    {
+        var work = SystemParameters.WorkArea;
+        Left = work.Left + 16;
+        Top = work.Bottom - ActualHeight - 16;
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -382,6 +404,7 @@ public partial class MainWindow : Window
     {
         if (!_clickThrough)
         {
+            _userMoved = true;
             DragMove();
         }
     }
@@ -404,6 +427,7 @@ public partial class MainWindow : Window
         SetWindowPos(handle, new IntPtr(-1), 0, 0, 0, 0,
             SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged);
         StatusText.Text = _clickThrough ? "CLICK-THROUGH ON" : "CLICK-THROUGH OFF";
+        ClickThroughHint.Text = _clickThrough ? "CTRL+ALT+H  TO RESTORE" : "CTRL+ALT+H  CLICK-THROUGH";
     }
 
     private void ResetTimers_Click(object sender, RoutedEventArgs e)
