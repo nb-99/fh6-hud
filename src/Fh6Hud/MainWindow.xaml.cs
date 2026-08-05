@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -165,9 +165,9 @@ public partial class MainWindow : Window
         SetText(CurPsText, $"{PowerCurveTracker.WattsToPs(packet.PowerWatts):F0} PS");
         UpdatePowerCurveDot(packet.CurrentEngineRpm, packet.PowerWatts);
 
-        _timer0To100.Update(packet.SpeedKmh);
-        _timer100To200.Update(packet.SpeedKmh);
-        _timer200To300.Update(packet.SpeedKmh);
+        _timer0To100.Update(packet.SpeedKmh, packet.TimestampMs);
+        _timer100To200.Update(packet.SpeedKmh, packet.TimestampMs);
+        _timer200To300.Update(packet.SpeedKmh, packet.TimestampMs);
         UpdateIntervalRow(_timer0To100, T0_100_Time, T0_100_State);
         UpdateIntervalRow(_timer100To200, T100_200_Time, T100_200_State);
         UpdateIntervalRow(_timer200To300, T200_300_Time, T200_300_State);
