@@ -105,4 +105,68 @@ public class HudConfigTests : IDisposable
         Assert.DoesNotContain("SourcePath", json);
         Assert.DoesNotContain("LoadFailed", json);
     }
+
+    [Fact]
+    public void Load_MissingFile_ProvidesDefaultPanelLayout()
+    {
+        var config = HudConfig.Load(PathFor("missing-panels.json"));
+
+        Assert.Equal(5, config.Panels.Count);
+        var tires = config.Panels[PanelKeys.Tires];
+        Assert.Equal(0.20, tires.X);
+        Assert.Equal(0.80, tires.Y);
+        Assert.Equal(PanelAnchor.BottomLeft, tires.Anchor);
+        Assert.Equal(PanelAnchor.TopRight, config.Panels[PanelKeys.Intervals].Anchor);
+    }
+
+    [Fact]
+    public void Load_PartialPanels_FillsInMissingDefaults()
+    {
+        var path = PathFor("partial-panels.json");
+        File.WriteAllText(path, """{"Panels": {"Engine": {"X": 0.5, "Y": 0.5, "Anchor": "TopLeft"}}}""");
+
+        var config = HudConfig.Load(path);
+
+        Assert.False(config.LoadFailed);
+        Assert.Equal(5, config.Panels.Count);
+        Assert.Equal(0.5, config.Panels[PanelKeys.Engine].X);
+        Assert.Equal(0.20, config.Panels[PanelKeys.Tires].X); // default filled in
+    }
+
+    [Fact]
+    public void Save_RoundTripsPanelPlacements()
+    {
+        var path = PathFor("panels-roundtrip.json");
+        var config = HudConfig.Load(path);
+        config.Panels[PanelKeys.Speedo] = new PanelPlacement { X = 0.33, Y = 0.66, Anchor = PanelAnchor.BottomRight };
+
+        config.Save(path);
+
+        var reloaded = HudConfig.Load(path);
+        var speedo = reloaded.Panels[PanelKeys.Speedo];
+        Assert.Equal(0.33, speedo.X);
+        Assert.Equal(0.66, speedo.Y);
+        Assert.Equal(PanelAnchor.BottomRight, speedo.Anchor);
+    }
+
+    [Theory]
+    [InlineData(new[] { "--port", "45001" }, 45001)]
+    [InlineData(new[] { "--port=45001" }, 45001)]
+    [InlineData(new[] { "ignored", "--port", "45002", "tail" }, 45002)]
+    [InlineData(new[] { "--port", "0" }, null)]       // out of range
+    [InlineData(new[] { "--port", "70000" }, null)]   // out of range
+    [InlineData(new[] { "--port", "abc" }, null)]     // not a number
+    [InlineData(new[] { "--port" }, null)]            // missing value
+    [InlineData(new[] { "--scenario", "launch" }, null)] // no port arg
+    [InlineData(new string[0], null)]
+    public void ParsePortOverride_ReturnsFirstValidPortOrNull(string[] args, int? expected)
+    {
+        Assert.Equal(expected, HudConfig.ParsePortOverride(args));
+    }
+
+    [Fact]
+    public void ParsePortOverride_FirstValidPortWins_OverInvalidEarlierOne()
+    {
+        Assert.Equal(45001, HudConfig.ParsePortOverride(new[] { "--port", "abc", "--port", "45001" }));
+    }
 }

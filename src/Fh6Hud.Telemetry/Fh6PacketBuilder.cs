@@ -71,6 +71,33 @@ public sealed class Fh6PacketBuilder
         return this;
     }
 
+    public Fh6PacketBuilder DrivetrainType(int value)
+    {
+        WriteI32(224, value);
+        return this;
+    }
+
+    public Fh6PacketBuilder TireSlipRatio(float frontLeft, float frontRight, float rearLeft, float rearRight)
+    {
+        WriteF32(84, frontLeft);
+        WriteF32(88, frontRight);
+        WriteF32(92, rearLeft);
+        WriteF32(96, rearRight);
+        return this;
+    }
+
+    public Fh6PacketBuilder Accel(byte value)
+    {
+        _data[315] = value;
+        return this;
+    }
+
+    public Fh6PacketBuilder Clutch(byte value)
+    {
+        _data[317] = value;
+        return this;
+    }
+
     /// <summary>Returns a copy of the packet so later builder mutations (or
     /// caller-side edits of the returned buffer) cannot corrupt it.</summary>
     public byte[] Build() => (byte[])_data.Clone();

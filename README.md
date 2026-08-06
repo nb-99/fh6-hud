@@ -9,6 +9,28 @@ over the game window.
 
 ## Features
 
+- **Movable panels** — the HUD is split into five independent panels
+  (tires, engine, interval timers, speedometer, status). Drag any panel
+  anywhere with the left mouse button; its position is saved to
+  `config.json` as fractions of the screen, so the layout survives restarts
+  and resolution changes. The default layout: tires bottom-left (20% in),
+  engine bottom-right (right edge at 80% of screen width), interval timers on
+  the right edge at 25% of screen height, speedometer below them, status
+  bottom-middle.
+- **Shift advisor with big shift lights** — the HUD learns the car's power
+  curve and gear ratios from telemetry while you drive and computes the
+  optimal shift points per gear (where the power you'd have after the shift
+  equals the power in the current gear). The engine panel flashes a big
+  "▲ UPSHIFT" pill (red, at ~full throttle) when you reach the upshift
+  point, and a "▼ DOWNSHIFT" pill (blue, at ~half throttle) when a lower
+  gear would make more power — e.g. stuck in a gear too high after a corner.
+  Downshifts are only suggested when the post-shift RPM lands at least
+  400 RPM below the lower gear's own shift point (and its redline), so the
+  advice never bounces you off the rev limiter or into an immediate
+  upshift/downshift loop — a little less power in the higher gear beats
+  hitting the limiter. The title shows the learned point ("SHIFT @ 6400").
+  It self-calibrates per car after a few full-throttle pulls — no car
+  database.
 - **Tire temperature monitor** — live per-corner temps (FL / FR / RL / RR),
   colored by whether each tire is *cold*, *in its optimal operating range*, or
   *too hot*, based on the selected tire compound.
@@ -19,10 +41,10 @@ over the game window.
   a live power curve built from telemetry samples (peak power per 100-RPM
   bucket), plus current and max power in PS.
 - **Speed** — large current-speed readout and a 0–300 km/h progress bar.
-- **Overlay behavior** — transparent, frameless, always-on-top, draggable,
-  and one hotkey (`Ctrl+Alt+H`) away from full click-through so it never
-  blocks the game. Right-click for a context menu (tire compound, reset
-  timers, click-through, quit).
+- **Overlay behavior** — transparent, frameless, always-on-top panels, each
+  draggable, and one hotkey (`Ctrl+Alt+H`) away from full click-through so
+  nothing blocks the game. Right-click any panel for the context menu (tire
+  compound, reset timers, click-through, quit).
 - **Simulator** — develop/test without the game: streams synthetic telemetry
   (launch or cruise scenario).
 
@@ -55,9 +77,21 @@ over the game window.
 dotnet run --project src/Fh6Hud
 ```
 
-The HUD window appears at the bottom-left of the primary display. Drag it
-anywhere with the left mouse button. `Ctrl+Alt+H` toggles click-through so
-clicks pass to the game; right-click opens the HUD menu.
+The HUD listens on the `Port` from `config.json`. An optional `--port N`
+argument overrides it for that process only (never saved back to
+`config.json`). Run a test instance beside the production app — e.g. fed by
+the simulator while the game keeps streaming to the prod port — with:
+
+```sh
+dotnet run --project src/Fh6Hud -- --port 45001
+dotnet run --project tools/Fh6Hud.Simulator --port 45001 --scenario launch
+```
+
+Five panels appear at their configured positions. Drag each one anywhere with
+the left mouse button (the position is saved). `Ctrl+Alt+H` toggles
+click-through so clicks pass to the game; right-click any panel opens the HUD
+menu. While there is no live telemetry the content panels hide and the status
+panel stays as a compact indicator.
 
 ### Run without the game (simulator)
 
@@ -84,6 +118,22 @@ on build — edit the copy in the output folder to affect a published build):
 | `Port` | `45000` | UDP port the HUD listens on (must match the game) |
 | `TireCompound` | `Rally` | Compound preset used for the optimal temp range |
 | `TireOptMinC` / `TireOptMaxC` | `72` / `90` | Manual optimal range override (°C) |
+| `Panels` | *layout below* | Per-panel positions: `X`/`Y` are fractions of the work area (0–1), `Anchor` is the panel corner/edge those fractions refer to (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`, `TopCenter`, `BottomCenter`) |
+
+Default panel layout:
+
+```json
+"Panels": {
+  "Tires":     { "X": 0.20, "Y": 0.80, "Anchor": "BottomLeft" },
+  "Engine":    { "X": 0.80, "Y": 0.80, "Anchor": "BottomRight" },
+  "Intervals": { "X": 1.00, "Y": 0.25, "Anchor": "TopRight" },
+  "Speedo":    { "X": 1.00, "Y": 0.42, "Anchor": "TopRight" },
+  "Status":    { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" }
+}
+```
+
+Positions are rewritten when you drag a panel; edit the file to set a layout
+before first launch.
 
 The tire compound can also be changed live via the HUD's right-click menu
 (changes are saved back to `config.json`). Compound presets (Standard /
@@ -103,12 +153,20 @@ src/Fh6Hud.Telemetry/       telemetry library (plain net10.0, no WPF)
   UdpTelemetryListener.cs   UDP receiver (background thread)
   SpeedIntervalTimer.cs     interval timer state machines
   PowerCurveTracker.cs      power curve sampling
+  GearRatioTracker.cs       per-gear ratio learning (rpm per m/s)
+  ShiftPointAdvisor.cs      optimal upshift RPM from curve + ratios
   TireCompound.cs           compound presets
   HudConfig.cs              config load/save (config.json)
-src/Fh6Hud/                 WPF overlay app (MainWindow.xaml/.cs, App.xaml)
+  PanelPlacement.cs         panel layout model (fractions of work area)
+src/Fh6Hud/                 WPF overlay app
+  HudState.cs               shared telemetry state (listener, trackers, timers)
+  PanelWindow.cs            panel base: drag/persist, click-through, menu
+  Panels/                   TirePanel, EnginePanel, IntervalPanel,
+                            SpeedoPanel, StatusPanel
 tools/Fh6Hud.Simulator/     synthetic telemetry generator (no game needed)
-tests/Fh6Hud.Tests/         unit tests (parser, timers, power curve, config,
-                            compounds, UDP listener)
+tests/Fh6Hud.Tests/         unit tests (parser, timers, power curve, gear
+                            ratios, shift advisor, config, compounds, UDP
+                            listener)
 docs/fh6-data-out.md        official FH6 Data Out spec snapshot
 .opencode/skills/           opencode skills (FH6 telemetry + WPF overlay)
 ```
@@ -125,3 +183,17 @@ docs/fh6-data-out.md        official FH6 Data Out spec snapshot
   compound you select.
 - **Power curve is empty** — it fills in while driving; do a full-throttle
   pull through the rev range. The curve resets when you switch cars.
+- **Shift indicator stays "SHIFT --" / no lights** — the advisor needs both
+  the power curve and the gear ratios to be learned: do a few full-throttle
+  pulls through the gears (one pull through every gear is enough; the engine
+  panel learns gear ratios as rpm-per-speed while you drive with the clutch
+  fully engaged and no wheelspin). It also needs the next gear's post-shift
+  rev range to have been sampled — i.e. you must actually drive each gear.
+  Advice only appears in manual gears; in `D` and in the top gear there is
+  none. Everything resets when you switch cars. If the power curve keeps
+  falling after its peak, the upshift point sits below redline; if the car
+  pulls flat to the limiter, shifting at redline *is* optimal and the light
+  flashes there. The downshift light additionally requires a real power gain
+  (≥1.5%) and keeps 400 RPM of headroom below the lower gear's shift point,
+  so it stays quiet near the boundary, on flat power curves, and right after
+  an upshift at the limiter (no shift-down-into-limiter bounce).

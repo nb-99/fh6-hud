@@ -1,0 +1,48 @@
+<fh6:PanelWindow x:Class="Fh6Hud.Panels.StatusPanel"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:fh6="clr-namespace:Fh6Hud"
+                 Title="FH6 HUD Status">
+    <Border Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="11"
+            Padding="14,10"
+            MinWidth="360">
+        <StackPanel>
+            <Grid>
+                <StackPanel VerticalAlignment="Top">
+                    <TextBlock Text="FH6 // TELEMETRY"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="13"
+                               FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Ellipse x:Name="StatusDot"
+                             Width="8"
+                             Height="8"
+                             Fill="{StaticResource HotBrush}"
+                             Margin="0,0,7,0"/>
+                    <TextBlock x:Name="StatusText"
+                               Text="WAITING FOR TELEMETRY"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="10"
+                               FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,8,0,0">
+                <TextBlock x:Name="FooterLeft"
+                           Text="DATA OUT  |  60 HZ"
+                           Foreground="{StaticResource MutedBrush}"
+                           FontSize="9"/>
+                <TextBlock x:Name="ClickThroughHint"
+                           Text="CTRL+ALT+H  CLICK-THROUGH"
+                           HorizontalAlignment="Right"
+                           Foreground="{StaticResource MutedBrush}"
+                           FontSize="9"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</fh6:PanelWindow>

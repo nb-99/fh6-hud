@@ -1,8 +1,7 @@
 ﻿<Application x:Class="Fh6Hud.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Fh6Hud"
-             StartupUri="MainWindow.xaml">
+             xmlns:local="clr-namespace:Fh6Hud">
     <Application.Resources>
         <SolidColorBrush x:Key="PanelBrush" Color="#E60F1722"/>
         <SolidColorBrush x:Key="PanelBorderBrush" Color="#663D5267"/>
@@ -25,6 +24,8 @@
         <SolidColorBrush x:Key="ReadyBrush" Color="#8796A8"/>
         <SolidColorBrush x:Key="TimingBrush" Color="#FFC857"/>
         <SolidColorBrush x:Key="DoneBrush" Color="#50E3A4"/>
+        <SolidColorBrush x:Key="ShiftUpFillBrush" Color="#59FF6B6B"/>
+        <SolidColorBrush x:Key="ShiftDownFillBrush" Color="#594CB8FF"/>
         <FontFamily x:Key="DigitFont">Consolas</FontFamily>
     </Application.Resources>
 </Application>

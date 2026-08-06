@@ -2,5 +2,12 @@
   "Port": 45000,
   "TireCompound": "Rally",
   "TireOptMinC": 72.0,
-  "TireOptMaxC": 90.0
+  "TireOptMaxC": 90.0,
+  "Panels": {
+    "Tires": { "X": 0.20, "Y": 0.80, "Anchor": "BottomLeft" },
+    "Engine": { "X": 0.80, "Y": 0.80, "Anchor": "BottomRight" },
+    "Intervals": { "X": 1.00, "Y": 0.25, "Anchor": "TopRight" },
+    "Speedo": { "X": 1.00, "Y": 0.42, "Anchor": "TopRight" },
+    "Status": { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" }
+  }
 }

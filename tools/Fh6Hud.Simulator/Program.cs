@@ -12,7 +12,47 @@ namespace Fh6Hud.Simulator;
 public static class Program
 {
     private const float MaxRpm = 7000f;
+    private const float IdleRpm = 900f;
     private const float MaxPowerWatts = 320_000f;
+
+    // The simulated "game" upshifts here; the HUD's shift advisor learns the
+    // power curve and typically lands a bit below this, so the SHIFT indicator
+    // flashes briefly in every gear.
+    private const float SimShiftRpm = 6900f;
+
+    // Road speed (m/s) at redline per gear — i.e. real-feeling gear ratios.
+    private static readonly float[] GearTopSpeedMs = { 22.5f, 34.8f, 47.8f, 61.2f, 76.5f, 90f };
+
+    private static int GearForSpeed(float speed)
+    {
+        for (int g = 0; g < GearTopSpeedMs.Length; g++)
+        {
+            if (speed <= GearTopSpeedMs[g] * (SimShiftRpm / MaxRpm))
+            {
+                return g + 1;
+            }
+        }
+
+        return GearTopSpeedMs.Length;
+    }
+
+    private static float RpmFor(float speed, int gear)
+    {
+        if (speed < 0.1f)
+        {
+            return IdleRpm;
+        }
+
+        float topSpeed = GearTopSpeedMs[Math.Clamp(gear - 1, 0, GearTopSpeedMs.Length - 1)];
+        return Math.Max(IdleRpm, speed / topSpeed * MaxRpm);
+    }
+
+    // Power ramps to a 320 kW peak at 5600 RPM, then falls off 18% toward
+    // redline — the falloff is what creates a pre-redline optimal shift point.
+    private static float PowerW(float rpm) =>
+        rpm <= 5600f
+            ? 150_000f + (rpm - 1000f) * ((MaxPowerWatts - 150_000f) / 4600f)
+            : MaxPowerWatts * (1f - 0.18f * (rpm - 5600f) / 1400f);
 
     public static async Task<int> Main(string[] args)
     {
@@ -106,8 +146,9 @@ public static class Program
                 break;
         }
 
-        float rpm = speed < 0.1f ? 900f : 900f + speed / 90f * (MaxRpm - 900f);
-        float power = MaxPowerWatts * Math.Clamp((rpm - 900f) / 4500f, 0f, 1f);
+        int gear = GearForSpeed(speed);
+        float rpm = RpmFor(speed, gear);
+        float power = PowerW(rpm);
 
         var builder = new Fh6PacketBuilder()
             .IsRaceOn(1)
@@ -118,7 +159,8 @@ public static class Program
             .PowerWatts(power)
             .TorqueNm(450f)
             .TireTempC(fl, fr, rl, rr)
-            .Gear((byte)(speed < 0.1f ? 1 : Math.Min(6, (int)(speed / 15) + 1)));
+            .Accel(255)
+            .Gear((byte)gear);
 
         return builder.Build();
     }

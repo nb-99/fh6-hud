@@ -1,0 +1,42 @@
+<fh6:PanelWindow x:Class="Fh6Hud.Panels.SpeedoPanel"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:fh6="clr-namespace:Fh6Hud"
+                 Title="FH6 HUD Speedo">
+    <Border Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="11"
+            Padding="14,10">
+        <StackPanel Orientation="Horizontal">
+            <Border x:Name="GearChip"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="9,5"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,10,4">
+                <TextBlock x:Name="GearText"
+                           Text="--"
+                           FontFamily="{StaticResource DigitFont}"
+                           FontSize="17"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource AccentBrush}"/>
+            </Border>
+            <TextBlock x:Name="SpeedText"
+                       Text="--"
+                       FontFamily="{StaticResource DigitFont}"
+                       FontSize="42"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource TextBrush}"
+                       LineHeight="42"/>
+            <TextBlock Text="KM/H"
+                       Foreground="{StaticResource MutedBrush}"
+                       FontSize="11"
+                       FontWeight="Bold"
+                       VerticalAlignment="Bottom"
+                       Margin="8,0,0,6"/>
+        </StackPanel>
+    </Border>
+</fh6:PanelWindow>

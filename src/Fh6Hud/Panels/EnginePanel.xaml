@@ -1,0 +1,129 @@
+<fh6:PanelWindow x:Class="Fh6Hud.Panels.EnginePanel"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:fh6="clr-namespace:Fh6Hud"
+                 Title="FH6 HUD Engine">
+    <Border Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="11"
+            Padding="14,13"
+            MinWidth="288">
+        <StackPanel>
+            <Grid>
+                <TextBlock Text="ENGINE"
+                           Foreground="{StaticResource TextBrush}"
+                           FontSize="11"
+                           FontWeight="Bold"/>
+                <TextBlock x:Name="ShiftText"
+                           Text="SHIFT --"
+                           HorizontalAlignment="Right"
+                           Foreground="{StaticResource MutedBrush}"
+                           FontSize="10"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <TextBlock x:Name="RpmText"
+                           Text="----"
+                           FontFamily="{StaticResource DigitFont}"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TextBrush}"/>
+                <TextBlock x:Name="RpmMaxText"
+                           Text="/ ---- RPM"
+                           FontFamily="{StaticResource DigitFont}"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedBrush}"
+                           VerticalAlignment="Bottom"
+                           Margin="6,0,0,3"/>
+            </StackPanel>
+
+            <Border x:Name="ShiftLight"
+                    Margin="0,10,0,0"
+                    Background="{StaticResource ShiftUpFillBrush}"
+                    BorderBrush="{StaticResource HotBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12,7"
+                    Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock x:Name="ShiftLightArrow"
+                               Text="▲"
+                               FontFamily="Segoe UI Symbol"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource HotBrush}"/>
+                    <TextBlock x:Name="ShiftLightText"
+                               Text="UPSHIFT"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource HotBrush}"
+                               VerticalAlignment="Center"
+                               Margin="9,0,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Grid x:Name="RpmBarTrack" Height="7" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="9*"/>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource ProgressTrackBrush}" CornerRadius="3,0,0,3"/>
+                <Border x:Name="RpmBarFill"
+                        Grid.ColumnSpan="2"
+                        Width="0"
+                        HorizontalAlignment="Left"
+                        Background="{StaticResource AccentBrush}"
+                        CornerRadius="3"/>
+                <!-- Redline zone drawn last (on top). The blue fill is clamped
+                     to stop at the zone's left edge (RpmBarGeometry
+                     .FillWidthFraction), so it never crosses under this
+                     translucent band — an overlap would blend the colors and
+                     make the red appear to move. -->
+                <Border Grid.Column="1" Background="{StaticResource RedlineBrush}" CornerRadius="0,3,3,0"/>
+            </Grid>
+
+            <Canvas x:Name="PowerCurveCanvas"
+                    Height="80"
+                    Margin="0,12,0,0"
+                    ClipToBounds="True"
+                    HorizontalAlignment="Stretch">
+                <Polyline x:Name="PowerCurveLine"
+                          Stroke="{StaticResource AccentBrush}"
+                          StrokeThickness="1.5"/>
+                <Ellipse x:Name="PowerCurveDot"
+                         Width="6"
+                         Height="6"
+                         Fill="{StaticResource TimingBrush}"
+                         Visibility="Collapsed"/>
+            </Canvas>
+
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="MAX POWER" Foreground="{StaticResource MutedBrush}" FontSize="9"/>
+                    <TextBlock x:Name="MaxPsText"
+                               Text="--- PS"
+                               FontFamily="{StaticResource DigitFont}"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource SecondaryBrush}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="CURRENT POWER" Foreground="{StaticResource MutedBrush}" FontSize="9"/>
+                    <TextBlock x:Name="CurPsText"
+                               Text="--- PS"
+                               FontFamily="{StaticResource DigitFont}"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource SecondaryBrush}"/>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </Border>
+</fh6:PanelWindow>

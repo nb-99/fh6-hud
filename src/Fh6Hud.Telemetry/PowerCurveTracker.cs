@@ -8,12 +8,13 @@ namespace Fh6Hud.Telemetry;
 public sealed class PowerCurveTracker
 {
     public const float WattsPerPs = 735.49875f;
-    private const float BucketRpm = 100f;
+    public const float BucketRpm = 100f;
 
     private float[] _powerByBucket = Array.Empty<float>();
     private float _maxRpm;
     private float _maxPowerW;
     private bool _dirty;
+    private int _version;
 
     public float MaxRpm => _maxRpm;
 
@@ -26,6 +27,13 @@ public sealed class PowerCurveTracker
         get => _dirty;
         set => _dirty = value;
     }
+
+    /// <summary>
+    /// Increments whenever the sampled data changes (accepted sample, configure,
+    /// reset). Lets consumers like <see cref="ShiftPointAdvisor"/> cache derived
+    /// results without touching <see cref="IsDirty"/>, which the UI owns.
+    /// </summary>
+    public int Version => _version;
 
     public int BucketCount => _powerByBucket.Length;
 
@@ -44,6 +52,7 @@ public sealed class PowerCurveTracker
         _powerByBucket = new float[count];
         _maxPowerW = 0;
         _dirty = true;
+        _version++;
     }
 
     /// <summary>
@@ -58,6 +67,7 @@ public sealed class PowerCurveTracker
         _maxRpm = 0;
         _maxPowerW = 0;
         _dirty = true;
+        _version++;
     }
 
     /// <summary>Records a sample. Returns true if a bucket peak increased.</summary>
@@ -86,6 +96,7 @@ public sealed class PowerCurveTracker
         }
 
         _dirty = true;
+        _version++;
         return true;
     }
 

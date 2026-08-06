@@ -80,6 +80,19 @@ must land first.
     speed number is already uncapped. The bar's value is marginal — revisit
     only if it earns its space, otherwise consider deleting it.
 
+- [x] **UI-8 — Independent, movable panels** *(L, done 2026-08-06)*
+  - Replaces the single MainWindow with five panel windows (tires, engine,
+    interval timers, speedo, status), each draggable and persisted as
+    work-area fractions in `config.json` (`Panels` + `PanelPlacement`,
+    anchored corners/edges). Default layout: tires bottom-left 20%, engine
+    bottom-right ~80%, timers right edge 25% height, speedo below, status
+    bottom-middle.
+  - Architecture: `HudState` (shared listener/trackers/timers) + `PanelWindow`
+    base (drag, persistence, shared context menu, global Ctrl+Alt+H) +
+    `App`-driven single `CompositionTarget.Rendering` loop. Panels hide while
+    there is no live data; the status panel stays as the chip.
+  - Enabled the ARCH-2 deferral check ("customizable panels" was the trigger).
+
 - [x] **UI-5 — Click-through affordance** *(S)*
   - When click-through is active, right-click passes to the game — the footer
     hint is the only way back. Toggle the footer text to
@@ -143,6 +156,53 @@ must land first.
 - [x] **FUNC-7 — `Fh6PacketBuilder.Build()` defensive copy** *(S)*
   - `Build()` returns the internal buffer; mutation after build corrupts
     subsequent packets. Return a copy.
+
+- [x] **FUNC-8 — Optimal upshift advisor** *(M, done 2026-08-06)*
+  - Shift where the power in the current gear meets the power after the
+    shift: `P(rpm) <= P(rpm * ratio_{n+1}/ratio_n)`; no crossover → redline.
+  - `GearRatioTracker` learns per-gear rpm-per-(m/s) from telemetry (gated on
+    clutch engaged, speed, driven-wheel slip via `DrivetrainType`), saturated
+    mean re-converges on gearing changes. `ShiftPointAdvisor` caches per-gear
+    points on curve/ratio versions, latches with hysteresis. Display: shift
+    RPM in the engine panel title + flashing shift lights (see FUNC-9).
+  - Declined: pre-shift margin for shift time (redline fallback only),
+    gear-ratio UI readouts. No advice in D/top gear by design.
+  - Later revision (`[BUG]`): the red shift-point marker line on the power
+    curve was removed — it sat on top of the blue curve, jumped with each
+    gear's (different) shift point and while learning, and rendered only
+    partially/intermittently, which read as a stray "moving red bar
+    overlapping the blue". The curve now also truncates at the last sampled
+    bucket instead of plunging to the canvas bottom while its high-RPM tail
+    is still being learned.
+
+- [x] **FUNC-9 — Downshift advice + prominent shift lights** *(S, done 2026-08-06)*
+  - Downshift when the lower gear makes more power without hitting the
+    limiter or landing past its own shift point: threshold
+    `downshiftRpm(g) = (shiftRpm(g-1) − 400) · ratio_g / ratio_{g-1}` (the
+    lower gear's optimal upshift point seen from this gear, minus a safety
+    margin), engagement gated on a ≥1.5% power gain (deadband), same 150 RPM
+    hysteresis latch as upshift.
+  - Safety margin rationale (`[BUG]`): with power rising to redline,
+    `shiftRpm(g-1)` falls back to redline and the un-margined threshold sat
+    exactly at the RPM you land on after a limiter-bounce upshift — the HUD
+    advised shifting straight back down into the limiter. The 400 RPM margin
+    guarantees the post-shift RPM stays clear of the lower gear's shift
+    point/redline. Also tightened the upshift crossover from `<=` to `<`
+    (equal power = no benefit; flat curves previously "shifted at idle").
+  - UI: a big flashing pill in the engine panel — red "▲ UPSHIFT" (≥80%
+    throttle) / blue "▼ DOWNSHIFT" (≥50% throttle); the title keeps the
+    steady "SHIFT @ n" hint. Flicker-free: Hidden (not Collapsed) while
+    blinking.
+
+- [x] **FUNC-10 — CLI port override for test instances** *(S, done 2026-08-06)*
+  - `--port N` on the HUD app overrides the configured port for that process
+    only — a simulator-fed test instance can run beside the production app
+    without mixing in the game's stream on the shared port. `Config.Port` is
+    deliberately not mutated, so a menu-driven `Save()` can never persist the
+    test port into `config.json`. Parser lives on
+    `HudConfig.ParsePortOverride` (unit-tested: both `--port N` and
+    `--port=N`, invalid/out-of-range values ignored); the simulator already
+    supported `--port`.
 
 ---
 
