@@ -86,13 +86,25 @@ public sealed class HudState : IDisposable
     {
         var packet = Latest;
         bool stale = (DateTime.UtcNow - LastPacketAtUtc).TotalSeconds > StaleAfterSeconds;
-        Live = packet is not null && !stale && packet.IsRaceOn != 0;
+        bool live = packet is not null && !stale && packet.IsRaceOn != 0;
+
+        if (live != Live)
+        {
+            Live = live;
+            if (packet is null || stale)
+            {
+                NoDataMessage = "FH6 // NO DATA";
+            }
+            else
+            {
+                NoDataMessage = packet.IsRaceOn == 0 ? "FH6 // IN MENU" : "FH6 // NO DATA";
+            }
+
+            HudLog.Info($"telemetry live={live} ({NoDataMessage})");
+        }
 
         if (!Live)
         {
-            NoDataMessage = packet is not null && !stale && packet.IsRaceOn == 0
-                ? "FH6 // IN MENU"
-                : "FH6 // NO DATA";
             return; // timers hold: Update() is not called while there is no live data
         }
 

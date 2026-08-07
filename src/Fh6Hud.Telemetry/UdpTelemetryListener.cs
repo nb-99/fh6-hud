@@ -34,6 +34,9 @@ public sealed class UdpTelemetryListener : IDisposable
 
     public long PacketsReceived { get; private set; }
 
+    /// <summary>Datagrams of the right size that failed to parse (garbage on the port).</summary>
+    public long ParseFailures { get; private set; }
+
     public long ReceiveErrors { get; private set; }
 
     public int Port => _port;
@@ -59,6 +62,7 @@ public sealed class UdpTelemetryListener : IDisposable
                 var packet = Fh6Packet.Parse(buffer.AsSpan(0, received));
                 if (packet is null)
                 {
+                    ParseFailures++;
                     continue;
                 }
 

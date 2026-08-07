@@ -17,6 +17,13 @@ public sealed class HudConfig
     /// <summary>UDP port the game sends Data Out packets to (avoid 5200-5300).</summary>
     public int Port { get; set; } = 45000;
 
+    /// <summary>
+    /// Writes diagnostics to hud.log next to the config file (packet rates,
+    /// UI frame rates, state changes, errors). The <c>--debug</c> CLI flag
+    /// enables it for a single run without editing the config.
+    /// </summary>
+    public bool DebugLog { get; set; }
+
     /// <summary>Selected tire compound preset name (see Telemetry/TireCompound.cs).</summary>
     public string TireCompound { get; set; } = "Rally";
 
