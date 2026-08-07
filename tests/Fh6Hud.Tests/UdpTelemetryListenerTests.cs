@@ -43,6 +43,20 @@ public class UdpTelemetryListenerTests : IDisposable
     }
 
     [Fact]
+    public void Dispose_ReturnsPromptlyWhileReceiveIsBlocked()
+    {
+        // Regression: on macOS/Unix, disposing a socket does not wake a
+        // blocked ReceiveFrom — an unbounded receive made Dispose (and with
+        // it the whole test host) hang forever. The listener now bounds its
+        // receive and waits for the loop before disposing.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        _listener.Dispose();
+        sw.Stop();
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2),
+            $"Dispose took {sw.ElapsedMilliseconds} ms with a blocked receive");
+    }
+
+    [Fact]
     public async Task InvalidDatagram_DoesNotBreakListener()
     {
         var tcs = new TaskCompletionSource<Fh6Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
