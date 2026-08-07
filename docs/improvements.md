@@ -302,9 +302,10 @@ must land first.
     (`RevBarLayoutModelTests`: zone edge constant + fill never enters the
     zone under a driving profile; goes red on the legacy rules). Later
     styled as a yellow→orange→red gradient ("approaching the limiter").
-    Reports
-    of motion on the fixed build trace to stale instances — rebuild and
-    restart.
+    A follow-up layout bug was found in the gradient build: the blue fill
+    spanned both `Grid` star columns, so `SizeToContent` redistributed them
+    from the fill's current width and made the gradient grow left at high
+    RPM. Keeping the fill in column 0 preserves the fixed 10 % right zone.
   - **What would have prevented it:** a z-order/geometry regression test
     at the rev bar (none existed; `RpmBarGeometry` was pure math only).
     Now covered by `RevBarLayoutModelTests`.
