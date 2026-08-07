@@ -57,9 +57,12 @@ public abstract class PanelWindow : Window
         SourceInitialized += OnSourceInitialized;
         SizeChanged += OnSizeChanged;
         Closed += OnClosed;
+        // Debug logging: activation is exactly what the affected machine needs
+        // to correlate "HUD clicked → starts refreshing" with render stalls.
+        Activated += (_, _) => HudLog.Debug($"{GetType().Name} activated");
+        Deactivated += (_, _) => HudLog.Debug($"{GetType().Name} deactivated");
         All.Add(this);
     }
-
     protected HudState State { get; }
 
     protected string PanelKey { get; }
