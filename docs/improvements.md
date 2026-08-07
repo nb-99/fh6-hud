@@ -297,10 +297,12 @@ must land first.
     profile) measures the perceived red edge at exactly the same pixel in
     every frame.
   - **Fix (2026-08-07):** `RedlineBrush` made opaque (`#59FF5C5C` →
-    `#FFFF5C5C`) so the band is a solid, crisp, static block anchored at
-    the redline (top 10 % of `EngineMaxRpm`); regression lock added
+    `#FFFF5C5C`) so the band is a crisp, static block anchored at the
+    redline (top 10 % of `EngineMaxRpm`); regression lock added
     (`RevBarLayoutModelTests`: zone edge constant + fill never enters the
-    zone under a driving profile; goes red on the legacy rules). Reports
+    zone under a driving profile; goes red on the legacy rules). Later
+    styled as a yellow→orange→red gradient ("approaching the limiter").
+    Reports
     of motion on the fixed build trace to stale instances — rebuild and
     restart.
   - **What would have prevented it:** a z-order/geometry regression test

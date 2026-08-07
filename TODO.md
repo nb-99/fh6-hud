@@ -29,9 +29,9 @@ old published folder) or a misread of the (previously 35 % alpha, dim)
 band.
 
 **Fix landed on this branch:**
-- `RedlineBrush` is now **opaque** (`#FFFF5C5C`) — a solid, crisp redline
-  band whose left edge is a hard pixel boundary at 90 % max RPM (i.e. the
-  top 10 % of the rev range, anchored at the redline = `EngineMaxRpm`).
+- `RedlineBrush` is now an **opaque yellow→orange→red gradient** — a crisp
+  band reading "approaching the limiter", its right edge exactly at the
+  redline (top 10 % of the rev range, anchored at `EngineMaxRpm`).
 - Regression lock: `RevBarLayoutModelTests` asserts the zone's visible
   left edge is constant and the fill never enters the zone under a driving
   profile.
