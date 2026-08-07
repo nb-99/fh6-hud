@@ -21,6 +21,28 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
+    public void MaxPowerRpm_IsBucketMidpoint_OfMaxBucket()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+
+        tracker.AddSample(2000f, 100_000f);
+        Assert.Equal(2050f, tracker.MaxPowerRpm);
+
+        tracker.AddSample(5000f, 300_000f);
+        Assert.Equal(5050f, tracker.MaxPowerRpm);
+
+        // A later lower sample must not move the max-power RPM.
+        tracker.AddSample(6000f, 200_000f);
+        Assert.Equal(5050f, tracker.MaxPowerRpm);
+
+        // Reset and reconfigure must forget the RPM again.
+        tracker.Reset();
+        tracker.Configure(7000f);
+        Assert.Equal(0f, tracker.MaxPowerRpm);
+    }
+
+    [Fact]
     public void MaxRpmChange_ResetsCurve()
     {
         var tracker = new PowerCurveTracker();

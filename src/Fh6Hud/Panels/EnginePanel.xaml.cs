@@ -53,7 +53,8 @@ public partial class EnginePanel : PanelWindow
             RebuildPowerCurve();
         }
 
-        SetText(MaxPsText, $"{State.PowerCurve.MaxPowerPs:F0} PS");
+        SetText(MaxPsText, State.PowerCurve.MaxPowerPs > 0 ? $"{State.PowerCurve.MaxPowerPs:F0} PS" : "--- PS");
+        SetText(MaxPowerRpmText, State.PowerCurve.MaxPowerRpm > 0 ? $"@ {State.PowerCurve.MaxPowerRpm:F0} RPM" : "@ ---- RPM");
         SetText(CurPsText, $"{PowerCurveTracker.WattsToPs(packet.PowerWatts):F0} PS");
         UpdatePowerCurveDot(packet.CurrentEngineRpm, packet.PowerWatts);
         UpdateShiftAdvice(packet);

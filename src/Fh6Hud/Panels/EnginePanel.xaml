@@ -119,6 +119,11 @@
                                FontSize="16"
                                FontWeight="Bold"
                                Foreground="{StaticResource SecondaryBrush}"/>
+                    <TextBlock x:Name="MaxPowerRpmText"
+                               Text="@ ---- RPM"
+                               FontFamily="{StaticResource DigitFont}"
+                               FontSize="9"
+                               Foreground="{StaticResource MutedBrush}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="CURRENT POWER" Foreground="{StaticResource MutedBrush}" FontSize="9"/>
