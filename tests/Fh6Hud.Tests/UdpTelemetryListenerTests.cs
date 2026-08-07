@@ -40,6 +40,7 @@ public class UdpTelemetryListenerTests : IDisposable
 
         await Task.Delay(150);
         Assert.Equal(0, _listener.PacketsReceived);
+        Assert.Equal(1, _listener.ParseFailures);
     }
 
     [Fact]
@@ -76,5 +77,6 @@ public class UdpTelemetryListenerTests : IDisposable
         var packet = await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(1, packet.IsRaceOn);
         Assert.Equal(1, _listener.PacketsReceived);
+        Assert.Equal(1, _listener.ParseFailures);
     }
 }

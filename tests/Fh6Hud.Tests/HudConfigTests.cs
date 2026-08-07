@@ -63,12 +63,13 @@ public class HudConfigTests : IDisposable
     public void Load_ValidConfig_RoundTrips()
     {
         var path = PathFor("valid.json");
-        File.WriteAllText(path, """{"Port": 12345, "TireCompound": "Slick", "TireOptMinC": 90.0, "TireOptMaxC": 110.0}""");
+        File.WriteAllText(path, """{"Port": 12345, "DebugLog": true, "TireCompound": "Slick", "TireOptMinC": 90.0, "TireOptMaxC": 110.0}""");
 
         var config = HudConfig.Load(path);
 
         Assert.False(config.LoadFailed);
         Assert.Equal(12345, config.Port);
+        Assert.True(config.DebugLog);
         Assert.Equal("Slick", config.TireCompound);
         Assert.Equal(90f, config.TireOptMinC);
         Assert.Equal(110f, config.TireOptMaxC);
@@ -80,6 +81,7 @@ public class HudConfigTests : IDisposable
         var path = PathFor("roundtrip.json");
         var config = HudConfig.Load(path);
         config.Port = 54321;
+        config.DebugLog = true;
         config.TireCompound = "Snow";
         config.TireOptMinC = 62f;
         config.TireOptMaxC = 85f;
@@ -89,6 +91,7 @@ public class HudConfigTests : IDisposable
         var reloaded = HudConfig.Load(path);
         Assert.False(reloaded.LoadFailed);
         Assert.Equal(54321, reloaded.Port);
+        Assert.True(reloaded.DebugLog);
         Assert.Equal("Snow", reloaded.TireCompound);
         Assert.Equal(62f, reloaded.TireOptMinC);
         Assert.Equal(85f, reloaded.TireOptMaxC);

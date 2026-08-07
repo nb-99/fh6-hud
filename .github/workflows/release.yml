@@ -33,21 +33,39 @@ jobs:
       - name: Validate version
         id: version
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          $version = "${{ inputs.version }}".TrimStart('v')
-          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+          $version = $env:RELEASE_VERSION.Trim()
+          if ($version.StartsWith('v', [StringComparison]::OrdinalIgnoreCase)) {
+            $version = $version.Substring(1)
+          }
+          $semver = [regex]::Match(
+            $version,
+            '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$')
+          if (-not $semver.Success) {
             throw "Invalid semver: $version"
+          }
+          if ($semver.Groups[4].Success) {
+            foreach ($identifier in $semver.Groups[4].Value.Split('.')) {
+              if ($identifier -match '^\d+$' -and $identifier.Length -gt 1 -and $identifier.StartsWith('0')) {
+                throw "Invalid semver: numeric prerelease identifiers cannot have leading zeros"
+              }
+            }
           }
           "tag=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Publish
-        run: dotnet publish src/Fh6Hud/Fh6Hud.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+        run: dotnet publish src/Fh6Hud/Fh6Hud.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o release-publish
 
       - name: Package
         shell: pwsh
         run: |
-          $dir = "src/Fh6Hud/bin/Release/net10.0-windows/win-x64/publish"
-          Compress-Archive -Path "$dir/*" -DestinationPath "fh6-hud-${{ steps.version.outputs.tag }}-win-x64.zip"
+          $dir = Join-Path $env:GITHUB_WORKSPACE "release-publish"
+          if (-not (Test-Path -LiteralPath $dir)) {
+            throw "Publish output does not exist: $dir"
+          }
+          Compress-Archive -Path (Join-Path $dir "*") -DestinationPath "fh6-hud-${{ steps.version.outputs.tag }}-win-x64.zip"
 
       - name: Create tag
         run: |

@@ -39,7 +39,8 @@ over the game window.
   trigger a run). Best time per interval is kept.
 - **Engine & power** — current RPM, max RPM with a rev bar (redline zone),
   a live power curve built from telemetry samples (peak power per 100-RPM
-  bucket), plus current and max power in PS.
+  bucket), plus current and max power in PS with the estimated RPM at peak
+  power.
 - **Speed** — large current-speed readout and a 0–300 km/h progress bar.
 - **Overlay behavior** — transparent, frameless, always-on-top panels, each
   draggable, and one hotkey (`Ctrl+Alt+H`) away from full click-through so
@@ -79,8 +80,10 @@ dotnet run --project src/Fh6Hud
 
 The HUD listens on the `Port` from `config.json`. An optional `--port N`
 argument overrides it for that process only (never saved back to
-`config.json`). Run a test instance beside the production app — e.g. fed by
-the simulator while the game keeps streaming to the prod port — with:
+`config.json`). Add `"DebugLog": true` to the config or pass `--debug` to write
+diagnostics to `hud.log` next to the executable. Run a test instance beside the
+production app — e.g. fed by the simulator while the game keeps streaming to
+the prod port — with:
 
 ```sh
 dotnet run --project src/Fh6Hud -- --port 45001
@@ -116,6 +119,7 @@ on build — edit the copy in the output folder to affect a published build):
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `Port` | `45000` | UDP port the HUD listens on (must match the game) |
+| `DebugLog` | `false` | Write packet, render, state, panel, and exception diagnostics to `hud.log` |
 | `TireCompound` | `Rally` | Compound preset used for the optimal temp range |
 | `TireOptMinC` / `TireOptMaxC` | `72` / `90` | Manual optimal range override (°C) |
 | `Panels` | *layout below* | Per-panel positions: `X`/`Y` are fractions of the work area (0–1), `Anchor` is the panel corner/edge those fractions refer to (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`, `TopCenter`, `BottomCenter`) |

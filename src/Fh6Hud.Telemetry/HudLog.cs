@@ -10,6 +10,13 @@ namespace Fh6Hud.Telemetry;
 /// </summary>
 public static class HudLog
 {
+    private enum LogLevel
+    {
+        Debug,
+        Info,
+        Error,
+    }
+
     private static readonly object Sync = new();
 
     /// <summary>True once <see cref="Initialize"/> was called with enabled=true.</summary>
@@ -21,38 +28,44 @@ public static class HudLog
     /// <summary>Enables (or disables) logging and pins the log file path.</summary>
     public static void Initialize(string filePath, bool enabled)
     {
-        FilePath = filePath;
-        Enabled = enabled;
-        if (enabled)
+        bool writeStartLine;
+        lock (Sync)
         {
-            Write("INFO", $"HUD log started -> {filePath}");
+            writeStartLine = enabled
+                && (!Enabled || !string.Equals(FilePath, filePath, StringComparison.Ordinal));
+            FilePath = filePath;
+            Enabled = enabled;
+        }
+
+        if (writeStartLine)
+        {
+            Write(LogLevel.Info, $"HUD log started -> {filePath}");
         }
     }
 
-    public static void Debug(string message) => Write("DEBUG", message);
+    public static void Debug(string message) => Write(LogLevel.Debug, message);
 
-    public static void Info(string message) => Write("INFO", message);
+    public static void Info(string message) => Write(LogLevel.Info, message);
 
-    public static void Warn(string message) => Write("WARN", message);
-
-    public static void Error(string message) => Write("ERROR", message);
+    public static void Error(string message) => Write(LogLevel.Error, message);
 
     public static void Error(string message, Exception exception) =>
-        Write("ERROR", $"{message}: {exception}");
+        Write(LogLevel.Error, $"{message}: {exception}");
 
-    private static void Write(string level, string message)
+    private static void Write(LogLevel level, string message)
     {
-        if (!Enabled || string.IsNullOrEmpty(FilePath))
-        {
-            return;
-        }
-
         lock (Sync)
         {
+            string? path = FilePath;
+            if (!Enabled || string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
             try
             {
-                File.AppendAllText(FilePath,
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}{Environment.NewLine}");
+                File.AppendAllText(path,
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level.ToString().ToUpperInvariant()}] {message}{Environment.NewLine}");
             }
             catch
             {

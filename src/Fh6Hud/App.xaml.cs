@@ -28,18 +28,23 @@ public partial class App : Application
     private int _renderTicks;
     private long _lastPackets;
     private int _watchdogTicks;
+    private int _reportRenderTicks;
+    private long _reportPackets;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        bool debug = e.Args.Any(a => a.Equals("--debug", StringComparison.OrdinalIgnoreCase));
+        string logPath = Path.Combine(AppContext.BaseDirectory, "hud.log");
+        HudLog.Initialize(logPath, debug);
+        WireExceptionLogging();
+
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-
-        bool debug = e.Args.Any(a => a.Equals("--debug", StringComparison.OrdinalIgnoreCase));
 
         _state = new HudState();
         _state.Initialize(HudConfig.ParsePortOverride(e.Args));
 
-        HudLog.Initialize(Path.Combine(AppContext.BaseDirectory, "hud.log"), debug || _state.Config.DebugLog);
+        HudLog.Initialize(logPath, debug || _state.Config.DebugLog);
         if (_state.ListenerError is not null)
         {
             HudLog.Error(_state.ListenerError);
@@ -63,7 +68,6 @@ public partial class App : Application
         _watchdog.Tick += OnWatchdogTick;
         _watchdog.Start();
 
-        WireExceptionLogging();
         HudLog.Info($"started port={(int?)_state.Listener?.Port ?? _state.Config.Port} debug={HudLog.Enabled}");
     }
 
@@ -90,12 +94,14 @@ public partial class App : Application
         int renders = _renderTicks;
         _renderTicks = 0;
 
-        long packets = _state!.Listener?.PacketsReceived ?? 0;
+        long packets = _state!.PacketsReceived;
         long newPackets = packets - _lastPackets;
         _lastPackets = packets;
 
         double ageMs = (DateTime.UtcNow - _state.LastPacketAtUtc).TotalMilliseconds;
         _watchdogTicks++;
+        _reportRenderTicks += renders;
+        _reportPackets += newPackets;
 
         if (renders == 0 && newPackets > 0)
         {
@@ -108,9 +114,11 @@ public partial class App : Application
         {
             double seconds = WatchdogIntervalMs * WatchdogReportEveryTicks / 1000.0;
             HudLog.Info(
-                $"DIAG packets={newPackets / seconds:0.0}/s renders={renders / seconds:0.0}/s " +
-                $"lastPacketAge={ageMs:0}ms live={_state.Live} parseFailures={_state.Listener?.ParseFailures ?? 0} " +
-                $"receiveErrors={_state.Listener?.ReceiveErrors ?? 0}");
+                $"DIAG packets={_reportPackets / seconds:0.0}/s renders={_reportRenderTicks / seconds:0.0}/s " +
+                $"lastPacketAge={ageMs:0}ms live={_state.Live} parseFailures={_state.ParseFailures} " +
+                $"receiveErrors={_state.ReceiveErrors}");
+            _reportPackets = 0;
+            _reportRenderTicks = 0;
         }
     }
 

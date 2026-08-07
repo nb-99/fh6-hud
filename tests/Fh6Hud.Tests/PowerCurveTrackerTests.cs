@@ -43,6 +43,19 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
+    public void MaxPowerRpm_DoesNotExceedConfiguredRedline()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+
+        tracker.AddSample(7000f, 300_000f);
+        Assert.Equal(7000f, tracker.MaxPowerRpm);
+
+        tracker.AddSample(7500f, 350_000f);
+        Assert.Equal(7000f, tracker.MaxPowerRpm);
+    }
+
+    [Fact]
     public void MaxRpmChange_ResetsCurve()
     {
         var tracker = new PowerCurveTracker();

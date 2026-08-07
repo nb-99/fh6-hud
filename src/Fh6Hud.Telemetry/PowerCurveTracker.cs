@@ -105,7 +105,7 @@ public sealed class PowerCurveTracker
             _maxPowerW = powerW;
             // The peak landed somewhere inside the bucket; the midpoint is the
             // best estimate at bucket resolution.
-            _maxPowerRpm = idx * BucketRpm + BucketRpm / 2f;
+            _maxPowerRpm = Math.Min(_maxRpm, idx * BucketRpm + BucketRpm / 2f);
         }
 
         _dirty = true;

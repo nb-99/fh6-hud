@@ -27,6 +27,7 @@ public partial class EnginePanel : PanelWindow
     private readonly SolidColorBrush _mutedBrush;
     private readonly SolidColorBrush _shiftUpFillBrush;
     private readonly SolidColorBrush _shiftDownFillBrush;
+    private int _renderedPowerCurveVersion = -1;
 
     public EnginePanel(HudState state)
         : base(state, PanelKeys.Engine)
@@ -53,8 +54,12 @@ public partial class EnginePanel : PanelWindow
             RebuildPowerCurve();
         }
 
-        SetText(MaxPsText, State.PowerCurve.MaxPowerPs > 0 ? $"{State.PowerCurve.MaxPowerPs:F0} PS" : "--- PS");
-        SetText(MaxPowerRpmText, State.PowerCurve.MaxPowerRpm > 0 ? $"@ {State.PowerCurve.MaxPowerRpm:F0} RPM" : "@ ---- RPM");
+        if (_renderedPowerCurveVersion != State.PowerCurve.Version)
+        {
+            SetText(MaxPsText, State.PowerCurve.MaxPowerPs > 0 ? $"{State.PowerCurve.MaxPowerPs:F0} PS" : "--- PS");
+            SetText(MaxPowerRpmText, State.PowerCurve.MaxPowerRpm > 0 ? $"@ {State.PowerCurve.MaxPowerRpm:F0} RPM" : "@ ---- RPM");
+            _renderedPowerCurveVersion = State.PowerCurve.Version;
+        }
         SetText(CurPsText, $"{PowerCurveTracker.WattsToPs(packet.PowerWatts):F0} PS");
         UpdatePowerCurveDot(packet.CurrentEngineRpm, packet.PowerWatts);
         UpdateShiftAdvice(packet);
