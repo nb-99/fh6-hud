@@ -4,8 +4,6 @@
                  xmlns:fh6="clr-namespace:Fh6Hud"
                  Title="FH6 HUD Shift Cue">
     <Border x:Name="ShiftCue"
-            Width="136"
-            MinHeight="49"
             Background="{StaticResource ShiftUpFillBrush}"
             BorderBrush="{StaticResource HotBrush}"
             BorderThickness="1"
