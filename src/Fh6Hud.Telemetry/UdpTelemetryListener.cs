@@ -14,10 +14,16 @@ public sealed class UdpTelemetryListener : IDisposable
     private readonly Task _loop;
     private readonly Socket _socket;
     private readonly int _port;
+    private bool _disposed;
 
     public UdpTelemetryListener(int port)
     {
         _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        // Bounded receive: on macOS/Unix disposing a socket does not wake a
+        // blocked ReceiveFrom, so an unbounded receive would deadlock Dispose
+        // (and hang the process/runner). With a timeout the loop wakes
+        // regularly and exits promptly once cancelled.
+        _socket.ReceiveTimeout = 250;
         _socket.Bind(new IPEndPoint(IPAddress.Any, port));
         _port = ((IPEndPoint)_socket.LocalEndPoint!).Port;
         _loop = Task.Run(() => ReceiveLoop(_cts.Token));
@@ -55,6 +61,10 @@ public sealed class UdpTelemetryListener : IDisposable
                 PacketsReceived++;
                 PacketReceived?.Invoke(this, packet);
             }
+            catch (SocketException ex) when (ex.SocketErrorCode is SocketError.TimedOut or SocketError.WouldBlock)
+            {
+                // Idle wake from ReceiveTimeout — re-check the token.
+            }
             catch (SocketException) when (token.IsCancellationRequested)
             {
                 break;
@@ -73,7 +83,16 @@ public sealed class UdpTelemetryListener : IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _cts.Cancel();
+        // Wait for the loop to leave its receive before disposing the socket:
+        // on macOS disposing while a receive is in flight blocks forever.
+        _loop.Wait(TimeSpan.FromSeconds(2));
         _socket.Dispose();
         _cts.Dispose();
     }
