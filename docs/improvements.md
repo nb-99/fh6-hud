@@ -280,3 +280,43 @@ must land first.
 - **Config persistence:** persist all fields except window position.
   `HudConfig.Load` already supports a user-supplied `config.json`; FUNC-4
   adds `Save()` so in-app changes persist to the same file.
+
+---
+
+## Bug post-mortems
+
+- [x] **BUG — "Moving" redline zone in the rev bar** *(2026-08-07)*
+  - **Symptom:** the red revlimiter band "moves left into the blue current
+    RPM bar" and is not at the car's actual redline.
+  - **Root cause:** pre-`3fb635c` geometry — blue fill drawn on top of the
+    zone, unclamped width. Above 90 % max RPM the fill covered the zone's
+    left part, so the visible red band's left edge tracked the fill (up to
+    18.5 px of travel per gear pull on a 260 px bar; the band vanished at
+    the limiter). `3fb635c` clamped the fill and drew the zone on top; a
+    pixel-level composite of the fixed build (exact palette, 114-frame
+    profile) measures the perceived red edge at exactly the same pixel in
+    every frame.
+  - **Fix (2026-08-07):** `RedlineBrush` made opaque (`#59FF5C5C` →
+    `#FFFF5C5C`) so the band is a solid, crisp, static block anchored at
+    the redline (top 10 % of `EngineMaxRpm`); regression lock added
+    (`RevBarLayoutModelTests`: zone edge constant + fill never enters the
+    zone under a driving profile; goes red on the legacy rules). Reports
+    of motion on the fixed build trace to stale instances — rebuild and
+    restart.
+  - **What would have prevented it:** a z-order/geometry regression test
+    at the rev bar (none existed; `RpmBarGeometry` was pure math only).
+    Now covered by `RevBarLayoutModelTests`.
+
+- [x] **BUG — Test suite hangs on macOS (listener dispose deadlock)** *(2026-08-07)*
+  - **Symptom:** `dotnet test` hangs forever; the host never finishes.
+    Any `UdpTelemetryListener` test (and the whole suite) deadlocked.
+  - **Root cause:** the listener's receive loop used an unbounded blocking
+    `Socket.ReceiveFrom`, and `Dispose` relied on `socket.Dispose()` waking
+    it. That is Windows behavior — on macOS/Unix disposing a socket does
+    **not** unblock an in-flight receive, so `Dispose` blocked forever.
+    CI was green only because it runs on `windows-latest`.
+  - **Fix:** bound the receive (`ReceiveTimeout = 250 ms`, idle timeouts
+    re-check the token), cancel → bounded `_loop.Wait` → dispose socket,
+    and make `Dispose` idempotent (a double dispose surfaced by the new
+    regression test). New test `Dispose_ReturnsPromptlyWhileReceiveIsBlocked`
+    pins it. Full suite now runs on macOS: 95/95 green.
