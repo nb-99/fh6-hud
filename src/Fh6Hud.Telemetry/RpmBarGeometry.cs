@@ -27,9 +27,9 @@ public static class RpmBarGeometry
     /// <summary>
     /// Width fraction of the blue fill: like <see cref="FillFraction"/>, but
     /// clamped to stop at the redline zone's left edge. The fill must never
-    /// cross under the red band — it is translucent, so an overlap shows the
-    /// blue through it and the blend's edge tracks the fill, making the red
-    /// appear to move.
+    /// cross under the red band — the zone sits on top of the fill (last
+    /// child of the track grid) and is opaque, so an overlap would be hidden
+    /// behind it and the blue would appear to stop at the wrong place.
     /// </summary>
     public static double FillWidthFraction(double rpm, double maxRpm) =>
         Math.Min(FillFraction(rpm, maxRpm), RedlineStartFraction);
