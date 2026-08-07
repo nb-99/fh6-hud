@@ -296,12 +296,12 @@ must land first.
     pixel-level composite of the fixed build (exact palette, 114-frame
     profile) measures the perceived red edge at exactly the same pixel in
     every frame.
-  - **Fix (2026-08-07):** `RedlineBrush` made opaque (`#59FF5C5C` →
-    `#FFFF5C5C`) so the band is a crisp, static block anchored at the
-    redline (top 10 % of `EngineMaxRpm`); regression lock added
+  - **Fix (2026-08-07):** `RedlineBrush` is an opaque yellow→orange→red
+    `LinearGradientBrush` (the intermediate solid `#FFFF5C5C` fix replaced
+    the former translucent `#59FF5C5C` brush), keeping the band anchored at
+    the redline (top 10 % of `EngineMaxRpm`); regression lock added
     (`RevBarLayoutModelTests`: zone edge constant + fill never enters the
-    zone under a driving profile; goes red on the legacy rules). Later
-    styled as a yellow→orange→red gradient ("approaching the limiter").
+    zone under a driving profile; goes red on the legacy rules).
     A follow-up layout bug was found in the gradient build: the blue fill
     spanned both `Grid` star columns, so `SizeToContent` redistributed them
     from the fill's current width and made the gradient grow left at high

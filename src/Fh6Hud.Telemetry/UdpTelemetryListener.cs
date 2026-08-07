@@ -14,6 +14,7 @@ public sealed class UdpTelemetryListener : IDisposable
     private readonly Task _loop;
     private readonly Socket _socket;
     private readonly int _port;
+    private readonly TaskCompletionSource _receiveLoopReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _disposed;
 
     public UdpTelemetryListener(int port)
@@ -37,6 +38,8 @@ public sealed class UdpTelemetryListener : IDisposable
 
     public int Port => _port;
 
+    internal Task ReceiveLoopReady => _receiveLoopReady.Task;
+
     private void ReceiveLoop(CancellationToken token)
     {
         var buffer = new byte[Fh6Packet.PacketSize + 64];
@@ -46,6 +49,7 @@ public sealed class UdpTelemetryListener : IDisposable
         {
             try
             {
+                _receiveLoopReady.TrySetResult();
                 int received = _socket.ReceiveFrom(buffer, SocketFlags.None, ref remote);
                 if (received != Fh6Packet.PacketSize)
                 {
@@ -92,7 +96,23 @@ public sealed class UdpTelemetryListener : IDisposable
         _cts.Cancel();
         // Wait for the loop to leave its receive before disposing the socket:
         // on macOS disposing while a receive is in flight blocks forever.
-        _loop.Wait(TimeSpan.FromSeconds(2));
+        if (_loop.Wait(TimeSpan.FromSeconds(2)))
+        {
+            DisposeResources();
+            return;
+        }
+
+        // If the loop did not stop in time, defer cleanup until it has exited
+        // rather than disposing the socket while ReceiveFrom may still run.
+        _ = _loop.ContinueWith(
+            _ => DisposeResources(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private void DisposeResources()
+    {
         _socket.Dispose();
         _cts.Dispose();
     }
