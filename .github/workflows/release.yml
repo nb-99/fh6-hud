@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version to release, e.g. 1.2.3 or 1.2.3-rc.1 (tag will be prefixed with v)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}".TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+            throw "Invalid semver: $version"
+          }
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publish
+        run: dotnet publish src/Fh6Hud/Fh6Hud.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dir = "src/Fh6Hud/bin/Release/net10.0-windows/win-x64/publish"
+          Compress-Archive -Path "$dir/*" -DestinationPath "fh6-hud-${{ steps.version.outputs.tag }}-win-x64.zip"
+
+      - name: Create tag
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" `
+            --title "${{ steps.version.outputs.tag }}" `
+            --generate-notes `
+            "fh6-hud-${{ steps.version.outputs.tag }}-win-x64.zip"
