@@ -9,7 +9,11 @@
         <SolidColorBrush x:Key="CardBorderBrush" Color="#663D5267"/>
         <SolidColorBrush x:Key="DividerBrush" Color="#663D5267"/>
         <SolidColorBrush x:Key="ProgressTrackBrush" Color="#66202B3A"/>
-        <SolidColorBrush x:Key="RedlineBrush" Color="#FFFF5C5C"/>
+        <LinearGradientBrush x:Key="RedlineBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#FFE066" Offset="0"/>
+            <GradientStop Color="#FF9500" Offset="0.5"/>
+            <GradientStop Color="#FF5C5C" Offset="1"/>
+        </LinearGradientBrush>
         <SolidColorBrush x:Key="TextBrush" Color="#F2F6FA"/>
         <SolidColorBrush x:Key="SecondaryBrush" Color="#C1CEDB"/>
         <SolidColorBrush x:Key="MutedBrush" Color="#8796A8"/>

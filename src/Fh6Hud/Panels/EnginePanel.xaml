@@ -77,13 +77,14 @@
                         HorizontalAlignment="Left"
                         Background="{StaticResource AccentBrush}"
                         CornerRadius="3"/>
-                <!-- Redline zone drawn last (on top). Opaque, fixed column: its
-                     left edge is a hard, static pixel boundary at the redline
-                     start (90% of max RPM). The blue fill is additionally
-                     clamped to stop there (RpmBarGeometry.FillWidthFraction),
-                     so the zone can never blend with or be covered by the
-                     fill — the red band is pinned at the car's redline and
-                     cannot move. -->
+                <!-- Redline zone drawn last (on top). Opaque
+                     yellow→orange→red gradient: the band reads as
+                     "approaching the limiter", with its right edge exactly
+                     at the car's redline (100% = EngineMaxRpm). The blue
+                     fill is additionally clamped to stop at the zone's left
+                     edge (RpmBarGeometry.FillWidthFraction), so the zone can
+                     never blend with or be covered by the fill — the band is
+                     pinned at the redline and cannot move. -->
                 <Border Grid.Column="1" Background="{StaticResource RedlineBrush}" CornerRadius="0,3,3,0"/>
             </Grid>
 
