@@ -114,12 +114,15 @@ public class HudConfigTests : IDisposable
     {
         var config = HudConfig.Load(PathFor("missing-panels.json"));
 
-        Assert.Equal(5, config.Panels.Count);
+        Assert.Equal(6, config.Panels.Count);
         var tires = config.Panels[PanelKeys.Tires];
         Assert.Equal(0.20, tires.X);
         Assert.Equal(0.80, tires.Y);
         Assert.Equal(PanelAnchor.BottomLeft, tires.Anchor);
         Assert.Equal(PanelAnchor.TopRight, config.Panels[PanelKeys.Intervals].Anchor);
+        Assert.Equal(0.50, config.Panels[PanelKeys.ShiftCue].X);
+        Assert.Equal(0.50, config.Panels[PanelKeys.ShiftCue].Y);
+        Assert.Equal(PanelAnchor.Center, config.Panels[PanelKeys.ShiftCue].Anchor);
     }
 
     [Fact]
@@ -131,7 +134,7 @@ public class HudConfigTests : IDisposable
         var config = HudConfig.Load(path);
 
         Assert.False(config.LoadFailed);
-        Assert.Equal(5, config.Panels.Count);
+        Assert.Equal(6, config.Panels.Count);
         Assert.Equal(0.5, config.Panels[PanelKeys.Engine].X);
         Assert.Equal(0.20, config.Panels[PanelKeys.Tires].X); // default filled in
     }

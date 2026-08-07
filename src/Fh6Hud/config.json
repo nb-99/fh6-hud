@@ -9,6 +9,7 @@
     "Engine": { "X": 0.80, "Y": 0.80, "Anchor": "BottomRight" },
     "Intervals": { "X": 1.00, "Y": 0.25, "Anchor": "TopRight" },
     "Speedo": { "X": 1.00, "Y": 0.42, "Anchor": "TopRight" },
-    "Status": { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" }
+    "Status": { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" },
+    "ShiftCue": { "X": 0.50, "Y": 0.50, "Anchor": "Center" }
   }
 }

@@ -28,7 +28,8 @@ public class GearRatioTrackerTests
         return Fh6Packet.Parse(bytes)!;
     }
 
-    private static void Feed(GearRatioTracker tracker, byte gear, float rpm, float speedMs, int count) {
+    private static void Feed(GearRatioTracker tracker, byte gear, float rpm, float speedMs, int count)
+    {
         for (int i = 0; i < count; i++)
         {
             tracker.AddSample(Packet(gear, rpm, speedMs));

@@ -55,6 +55,7 @@ public partial class App : Application
         _panels.Add(new Panels.StatusPanel(_state));
         _panels.Add(new Panels.TirePanel(_state));
         _panels.Add(new Panels.EnginePanel(_state));
+        _panels.Add(new Panels.ShiftCuePanel(_state));
         _panels.Add(new Panels.IntervalPanel(_state));
         _panels.Add(new Panels.SpeedoPanel(_state));
 

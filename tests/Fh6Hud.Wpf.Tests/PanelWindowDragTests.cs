@@ -10,6 +10,8 @@ namespace Fh6Hud.Wpf.Tests;
 
 public sealed class PanelWindowDragTests
 {
+    private static readonly Lock WpfTestLock = new();
+
     [Fact]
     public void MouseDrag_SavesUpdatedPlacement()
     {
@@ -24,7 +26,7 @@ public sealed class PanelWindowDragTests
             {
                 X = 0.25,
                 Y = 0.25,
-                Anchor = PanelAnchor.TopLeft,
+                Anchor = PanelAnchor.Center,
             };
             config.Save(configPath);
 
@@ -32,12 +34,16 @@ public sealed class PanelWindowDragTests
             var placement = HudConfig.Load(configPath).Panels[PanelKeys.Status];
             var workArea = SystemParameters.WorkArea;
 
+            Assert.InRange(
+                Math.Abs((result.InitialLeft + result.Width / 2) - (workArea.Left + workArea.Width * 0.25)),
+                0,
+                1);
             Assert.True(result.FinalLeft > result.InitialLeft + 20,
                 $"Expected the panel to move right, but it moved from {result.InitialLeft:F1} to {result.FinalLeft:F1}.");
             Assert.True(placement.X > result.InitialX,
                 $"Expected saved X to increase, but it moved from {result.InitialX:F4} to {placement.X:F4}.");
             Assert.InRange(
-                Math.Abs((workArea.Left + placement.X * workArea.Width) - result.FinalLeft),
+                Math.Abs((workArea.Left + placement.X * workArea.Width) - (result.FinalLeft + result.Width / 2)),
                 0,
                 1);
         }
@@ -71,6 +77,7 @@ public sealed class PanelWindowDragTests
         panel.UpdateLayout();
 
         double initialLeft = panel.Left;
+        double width = panel.ActualWidth;
         double initialX = state.Config.Panels[PanelKeys.Status].X;
         var mouseDown = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
         {
@@ -82,40 +89,43 @@ public sealed class PanelWindowDragTests
         panel.Close();
         state.Dispose();
         app.Shutdown();
-        return new DragResult(initialLeft, finalLeft, initialX);
+        return new DragResult(initialLeft, finalLeft, initialX, width);
     }
 
     private static T RunOnSta<T>(Func<T> action)
     {
-        T? result = default;
-        Exception? failure = null;
-        using var completed = new ManualResetEventSlim();
-        var thread = new Thread(() =>
+        lock (WpfTestLock)
         {
-            try
+            T? result = default;
+            Exception? failure = null;
+            using var completed = new ManualResetEventSlim();
+            var thread = new Thread(() =>
             {
-                result = action();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-            finally
-            {
-                completed.Set();
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
+                try
+                {
+                    result = action();
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+                finally
+                {
+                    completed.Set();
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
 
-        Assert.True(completed.Wait(TimeSpan.FromSeconds(10)), "The WPF test thread did not exit.");
-        thread.Join();
-        if (failure is not null)
-        {
-            ExceptionDispatchInfo.Capture(failure).Throw();
+            Assert.True(completed.Wait(TimeSpan.FromSeconds(10)), "The WPF test thread did not exit.");
+            thread.Join();
+            if (failure is not null)
+            {
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
+
+            return result!;
         }
-
-        return result!;
     }
 
     private sealed class TestPanel : PanelWindow
@@ -146,5 +156,5 @@ public sealed class PanelWindowDragTests
         }
     }
 
-    private readonly record struct DragResult(double InitialLeft, double FinalLeft, double InitialX);
+    private readonly record struct DragResult(double InitialLeft, double FinalLeft, double InitialX, double Width);
 }

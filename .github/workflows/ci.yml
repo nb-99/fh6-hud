@@ -25,8 +25,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Run tests
-        run: dotnet test Fh6Hud.slnx --configuration Release
+      - name: Run shared Windows validation
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1
 
   test-ubuntu:
     name: Test (Ubuntu, library only)
@@ -47,5 +47,5 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Run tests
-        run: dotnet test tests/Fh6Hud.Tests/Fh6Hud.Tests.csproj --configuration Release
+      - name: Run shared portable validation
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1 -Portable

@@ -9,8 +9,8 @@ over the game window.
 
 ## Features
 
-- **Movable panels** — the HUD is split into five independent panels
-  (tires, engine, interval timers, speedometer, status). Drag any panel
+- **Movable panels** — the HUD is split into six independent panels
+  (tires, engine, shift cue, interval timers, speedometer, status). Drag any panel
   anywhere with the left mouse button; its position is saved to
   `config.json` as fractions of the screen, so the layout survives restarts
   and resolution changes. The default layout: tires bottom-left (20% in),
@@ -20,7 +20,7 @@ over the game window.
 - **Shift advisor with big shift lights** — the HUD learns the car's power
   curve and gear ratios from telemetry while you drive and computes the
   optimal shift points per gear (where the power you'd have after the shift
-  equals the power in the current gear). The engine panel flashes a big
+  equals the power in the current gear). The centered shift-cue panel flashes a big
   "▲ UPSHIFT" pill (red, at ~full throttle) when you reach the upshift
   point, and a "▼ DOWNSHIFT" pill (blue, at ~half throttle) when a lower
   gear would make more power — e.g. stuck in a gear too high after a corner.
@@ -29,6 +29,8 @@ over the game window.
   advice never bounces you off the rev limiter or into an immediate
   upshift/downshift loop — a little less power in the higher gear beats
   hitting the limiter. The title shows the learned point ("SHIFT @ 6400").
+  The live cue is a separate centered panel that can be dragged into the
+  driver's field of view and shows a `SHIFT CUE` placeholder while editing.
   It self-calibrates per car after a few full-throttle pulls — no car
   database.
 - **Tire temperature monitor** — live per-corner temps (FL / FR / RL / RR),
@@ -90,7 +92,7 @@ dotnet run --project src/Fh6Hud -- --port 45001
 dotnet run --project tools/Fh6Hud.Simulator --port 45001 --scenario launch
 ```
 
-Five panels appear at their configured positions. Drag each one anywhere with
+Six panels appear at their configured positions. Drag each one anywhere with
 the left mouse button (the position is saved). `Ctrl+Alt+H` toggles
 click-through so clicks pass to the game; right-click any panel opens the HUD
 menu. While there is no live telemetry the content panels hide and the status
@@ -111,6 +113,27 @@ with tire warm-up).
 dotnet test Fh6Hud.slnx
 ```
 
+### Local validation
+
+The blocking validation contract checks whitespace, the explicitly configured
+style rule, a Release build, and the full test scope. Analyzer findings from
+the .NET SDK and Meziantou.Analyzer are reported by the build but do not block
+yet.
+
+```powershell
+pwsh -NoProfile -File scripts/validate.ps1
+```
+
+Lefthook is an optional manually installed contributor tool. Install it from
+your package manager or the official release page, then run `lefthook install`
+in the repository. The repository intentionally does not pin or auto-install
+the Lefthook binary; the hook invokes the same validation script as Windows CI.
+The portable CI scope can be run locally with:
+
+```powershell
+pwsh -NoProfile -File scripts/validate.ps1 -Portable
+```
+
 ## Configuration
 
 All settings live in `src/Fh6Hud/config.json` (copied next to the executable
@@ -122,7 +145,7 @@ on build — edit the copy in the output folder to affect a published build):
 | `DebugLog` | `false` | Write packet, render, state, panel, and exception diagnostics to `hud.log` |
 | `TireCompound` | `Rally` | Compound preset used for the optimal temp range |
 | `TireOptMinC` / `TireOptMaxC` | `72` / `90` | Manual optimal range override (°C) |
-| `Panels` | *layout below* | Per-panel positions: `X`/`Y` are fractions of the work area (0–1), `Anchor` is the panel corner/edge those fractions refer to (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`, `TopCenter`, `BottomCenter`) |
+| `Panels` | *layout below* | Per-panel positions: `X`/`Y` are fractions of the work area (0–1), `Anchor` is the panel corner/edge those fractions refer to (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`, `TopCenter`, `BottomCenter`, `Center`) |
 
 Default panel layout:
 
@@ -132,7 +155,8 @@ Default panel layout:
   "Engine":    { "X": 0.80, "Y": 0.80, "Anchor": "BottomRight" },
   "Intervals": { "X": 1.00, "Y": 0.25, "Anchor": "TopRight" },
   "Speedo":    { "X": 1.00, "Y": 0.42, "Anchor": "TopRight" },
-  "Status":    { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" }
+  "Status":    { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" },
+  "ShiftCue":  { "X": 0.50, "Y": 0.50, "Anchor": "Center" }
 }
 ```
 
@@ -165,8 +189,8 @@ src/Fh6Hud.Telemetry/       telemetry library (plain net10.0, no WPF)
 src/Fh6Hud/                 WPF overlay app
   HudState.cs               shared telemetry state (listener, trackers, timers)
   PanelWindow.cs            panel base: drag/persist, click-through, menu
-  Panels/                   TirePanel, EnginePanel, IntervalPanel,
-                            SpeedoPanel, StatusPanel
+  Panels/                   TirePanel, EnginePanel, ShiftCuePanel,
+                            IntervalPanel, SpeedoPanel, StatusPanel
 tools/Fh6Hud.Simulator/     synthetic telemetry generator (no game needed)
 tests/Fh6Hud.Tests/         unit tests (parser, timers, power curve, gear
                             ratios, shift advisor, config, compounds, UDP

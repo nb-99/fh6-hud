@@ -3,14 +3,14 @@
 ## [ ] Tire temps
 
 **Temperature Ranges:** Verify correct tire operating temperature ranges.
-**Visibility:** The temperature delta is too small and barely readable. Make it larger and put it alongside the current temp.
+**Visibility:** Resolved in issue #4: the state and signed delta are larger and sit above the current temperature.
 
-## [ ] UI Readability
+## [x] UI Readability — resolved in issue #4
 
 **Visibility:** Many elements, especially text, are barely readable or out of primaty vision. Texts should not be as small as current smaller texts for data that is relevant durint racing, where primary attention is on driving and data should be easily visible at a glance.
 **Positioning:** Some elements would benefit from being placed separately from their current panel. Primary example being the Upshift/Downshift indicator, which could be moved to the middle and be a bit larger to be placeable directly in the FOV of the road/car.
 
-## [ ] Hooks and CI for linting, validations etc
+## [x] Hooks and CI for linting, validations etc — resolved in issue #4
 
 ## [ ] Conifigurable Panels
 

@@ -7,26 +7,14 @@ namespace Fh6Hud.Panels;
 
 /// <summary>
 /// Engine RPM with redline bar, the learned power curve, current/max power,
-/// and the shift lights: a big flashing "▲ UPSHIFT" pill when the optimal
-/// upshift point of the current gear is reached, and a "▼ DOWNSHIFT" pill
-/// when a lower gear would make more power (without hitting the limiter or
-/// needing to shift back up). The title slot keeps a steady "SHIFT @ n" hint
-/// with the learned upshift point, and a marker line on the curve shows it.
+/// and the learned shift point. The title slot keeps a steady "SHIFT @ n" hint
+/// with the learned upshift point; the live upshift/downshift cue is rendered
+/// by <see cref="ShiftCuePanel"/>.
 /// </summary>
 public partial class EnginePanel : PanelWindow
 {
-    /// <summary>Throttle input (0-255) above which the upshift light is shown.</summary>
-    private const byte UpshiftThrottleThreshold = 200;
-
-    /// <summary>Throttle input (0-255) above which the downshift light is shown.</summary>
-    private const byte DownshiftThrottleThreshold = 128;
-
     private readonly SolidColorBrush _accentBrush;
-    private readonly SolidColorBrush _coldBrush;
-    private readonly SolidColorBrush _hotBrush;
     private readonly SolidColorBrush _mutedBrush;
-    private readonly SolidColorBrush _shiftUpFillBrush;
-    private readonly SolidColorBrush _shiftDownFillBrush;
     private int _renderedPowerCurveVersion = -1;
 
     public EnginePanel(HudState state)
@@ -35,11 +23,7 @@ public partial class EnginePanel : PanelWindow
         InitializeComponent();
 
         _accentBrush = (SolidColorBrush)FindResource("AccentBrush");
-        _coldBrush = (SolidColorBrush)FindResource("ColdBrush");
-        _hotBrush = (SolidColorBrush)FindResource("HotBrush");
         _mutedBrush = (SolidColorBrush)FindResource("MutedBrush");
-        _shiftUpFillBrush = (SolidColorBrush)FindResource("ShiftUpFillBrush");
-        _shiftDownFillBrush = (SolidColorBrush)FindResource("ShiftDownFillBrush");
     }
 
     protected override void Render(Fh6Packet packet)
@@ -62,10 +46,10 @@ public partial class EnginePanel : PanelWindow
         }
         SetText(CurPsText, $"{PowerCurveTracker.WattsToPs(packet.PowerWatts):F0} PS");
         UpdatePowerCurveDot(packet.CurrentEngineRpm, packet.PowerWatts);
-        UpdateShiftAdvice(packet);
+        UpdateShiftHint(packet);
     }
 
-    private void UpdateShiftAdvice(Fh6Packet packet)
+    private void UpdateShiftHint(Fh6Packet packet)
     {
         float? shiftRpm = GearRatioTracker.IsLearnableGear(packet.Gear)
             ? State.ShiftAdvisor.GetShiftRpm(packet.Gear)
@@ -75,46 +59,6 @@ public partial class EnginePanel : PanelWindow
         SetText(ShiftText, shiftRpm is { } rpm ? $"SHIFT @ {rpm:F0}" : "SHIFT --");
         ShiftText.Foreground = shiftRpm is null ? _mutedBrush : _accentBrush;
 
-        UpdateShiftLight(packet);
-    }
-
-    private void UpdateShiftLight(Fh6Packet packet)
-    {
-        bool up = State.ShiftAdvisor.ShouldUpshift(packet.Gear, packet.CurrentEngineRpm)
-                  && packet.Accel >= UpshiftThrottleThreshold;
-        bool down = State.ShiftAdvisor.ShouldDownshift(packet.Gear, packet.CurrentEngineRpm)
-                    && packet.Accel >= DownshiftThrottleThreshold;
-
-        if (!up && !down)
-        {
-            ShiftLight.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        // Flash at ~2.5 Hz; Hidden (not Collapsed) so the panel size stays put
-        // while blinking.
-        ShiftLight.Visibility = (Environment.TickCount64 / 200) % 2 == 0
-            ? Visibility.Visible
-            : Visibility.Hidden;
-
-        if (up)
-        {
-            ShiftLightArrow.Text = "▲";
-            ShiftLightText.Text = "UPSHIFT";
-            ShiftLightArrow.Foreground = _hotBrush;
-            ShiftLightText.Foreground = _hotBrush;
-            ShiftLight.Background = _shiftUpFillBrush;
-            ShiftLight.BorderBrush = _hotBrush;
-        }
-        else
-        {
-            ShiftLightArrow.Text = "▼";
-            ShiftLightText.Text = "DOWNSHIFT";
-            ShiftLightArrow.Foreground = _coldBrush;
-            ShiftLightText.Foreground = _coldBrush;
-            ShiftLight.Background = _shiftDownFillBrush;
-            ShiftLight.BorderBrush = _coldBrush;
-        }
     }
 
     private void RebuildPowerCurve()
