@@ -15,6 +15,9 @@ public sealed class UdpTelemetryListener : IDisposable
     private readonly Socket _socket;
     private readonly int _port;
     private readonly TaskCompletionSource _receiveLoopReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private long _packetsReceived;
+    private long _parseFailures;
+    private long _receiveErrors;
     private bool _disposed;
 
     public UdpTelemetryListener(int port)
@@ -32,12 +35,12 @@ public sealed class UdpTelemetryListener : IDisposable
 
     public event EventHandler<Fh6Packet>? PacketReceived;
 
-    public long PacketsReceived { get; private set; }
+    public long PacketsReceived => Interlocked.Read(ref _packetsReceived);
 
-    /// <summary>Datagrams of the right size that failed to parse (garbage on the port).</summary>
-    public long ParseFailures { get; private set; }
+    /// <summary>Datagrams rejected for an invalid size or failed parsing.</summary>
+    public long ParseFailures => Interlocked.Read(ref _parseFailures);
 
-    public long ReceiveErrors { get; private set; }
+    public long ReceiveErrors => Interlocked.Read(ref _receiveErrors);
 
     public int Port => _port;
 
@@ -56,17 +59,18 @@ public sealed class UdpTelemetryListener : IDisposable
                 int received = _socket.ReceiveFrom(buffer, SocketFlags.None, ref remote);
                 if (received != Fh6Packet.PacketSize)
                 {
+                    Interlocked.Increment(ref _parseFailures);
                     continue;
                 }
 
                 var packet = Fh6Packet.Parse(buffer.AsSpan(0, received));
                 if (packet is null)
                 {
-                    ParseFailures++;
+                    Interlocked.Increment(ref _parseFailures);
                     continue;
                 }
 
-                PacketsReceived++;
+                Interlocked.Increment(ref _packetsReceived);
                 PacketReceived?.Invoke(this, packet);
             }
             catch (SocketException ex) when (ex.SocketErrorCode is SocketError.TimedOut or SocketError.WouldBlock)
@@ -83,7 +87,7 @@ public sealed class UdpTelemetryListener : IDisposable
             }
             catch (Exception)
             {
-                ReceiveErrors++;
+                Interlocked.Increment(ref _receiveErrors);
                 Thread.Sleep(50);
             }
         }

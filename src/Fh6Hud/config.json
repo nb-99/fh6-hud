@@ -1,5 +1,6 @@
 {
   "Port": 45000,
+  "DebugLog": false,
   "TireCompound": "Rally",
   "TireOptMinC": 72.0,
   "TireOptMaxC": 90.0,

@@ -30,6 +30,12 @@ public sealed class HudState : IDisposable
 
     public UdpTelemetryListener? Listener { get; private set; }
 
+    public long PacketsReceived => Listener?.PacketsReceived ?? 0;
+
+    public long ParseFailures => Listener?.ParseFailures ?? 0;
+
+    public long ReceiveErrors => Listener?.ReceiveErrors ?? 0;
+
     /// <summary>Set when the configured port could not be bound.</summary>
     public string? ListenerError { get; private set; }
 
@@ -87,20 +93,23 @@ public sealed class HudState : IDisposable
         var packet = Latest;
         bool stale = (DateTime.UtcNow - LastPacketAtUtc).TotalSeconds > StaleAfterSeconds;
         bool live = packet is not null && !stale && packet.IsRaceOn != 0;
+        string noDataMessage = packet is not null && !stale && packet.IsRaceOn == 0
+            ? "FH6 // IN MENU"
+            : "FH6 // NO DATA";
+        bool liveChanged = live != Live;
+        bool noDataMessageChanged = !live && noDataMessage != NoDataMessage;
 
-        if (live != Live)
+        if (liveChanged || noDataMessageChanged)
         {
             Live = live;
-            if (packet is null || stale)
+            if (!live)
             {
-                NoDataMessage = "FH6 // NO DATA";
-            }
-            else
-            {
-                NoDataMessage = packet.IsRaceOn == 0 ? "FH6 // IN MENU" : "FH6 // NO DATA";
+                NoDataMessage = noDataMessage;
             }
 
-            HudLog.Info($"telemetry live={live} ({NoDataMessage})");
+            HudLog.Info(live
+                ? "telemetry live=True"
+                : $"telemetry live=False ({NoDataMessage})");
         }
 
         if (!Live)
