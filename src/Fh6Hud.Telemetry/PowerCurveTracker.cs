@@ -13,6 +13,7 @@ public sealed class PowerCurveTracker
     private float[] _powerByBucket = Array.Empty<float>();
     private float _maxRpm;
     private float _maxPowerW;
+    private float _maxPowerRpm;
     private bool _dirty;
     private int _version;
 
@@ -21,6 +22,13 @@ public sealed class PowerCurveTracker
     public float MaxPowerW => _maxPowerW;
 
     public float MaxPowerPs => _maxPowerW / WattsPerPs;
+
+    /// <summary>
+    /// RPM at which the max power was sampled (bucket midpoint — buckets are
+    /// <see cref="BucketRpm"/> wide, so this is an estimate at bucket
+    /// resolution). 0 until a sample arrived.
+    /// </summary>
+    public float MaxPowerRpm => _maxPowerRpm;
 
     public bool IsDirty
     {
@@ -51,6 +59,7 @@ public sealed class PowerCurveTracker
         int count = (int)(maxRpm / BucketRpm) + 1;
         _powerByBucket = new float[count];
         _maxPowerW = 0;
+        _maxPowerRpm = 0;
         _dirty = true;
         _version++;
     }
@@ -66,6 +75,7 @@ public sealed class PowerCurveTracker
         _powerByBucket = Array.Empty<float>();
         _maxRpm = 0;
         _maxPowerW = 0;
+        _maxPowerRpm = 0;
         _dirty = true;
         _version++;
     }
@@ -93,6 +103,9 @@ public sealed class PowerCurveTracker
         if (powerW > _maxPowerW)
         {
             _maxPowerW = powerW;
+            // The peak landed somewhere inside the bucket; the midpoint is the
+            // best estimate at bucket resolution.
+            _maxPowerRpm = idx * BucketRpm + BucketRpm / 2f;
         }
 
         _dirty = true;
