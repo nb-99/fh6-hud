@@ -184,9 +184,12 @@ public abstract class PanelWindow : Window
             return;
         }
 
-        DragMove();
+        MoveWindowForDrag();
         PersistPlacement();
     }
+
+    /// <summary>Moves the window for a left-button drag.</summary>
+    protected virtual void MoveWindowForDrag() => DragMove();
 
     private void PersistPlacement()
     {

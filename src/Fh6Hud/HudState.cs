@@ -70,9 +70,9 @@ public sealed class HudState : IDisposable
     /// left untouched so a later <c>Save()</c> cannot persist the test port
     /// into config.json.
     /// </param>
-    public void Initialize(int? portOverride = null)
+    public void Initialize(int? portOverride = null, string? configPath = null)
     {
-        Config = HudConfig.Load();
+        Config = HudConfig.Load(configPath);
         ApplyCompound(Config.TireCompound, save: false);
 
         int bindPort = portOverride ?? Config.Port;
