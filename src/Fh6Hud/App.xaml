@@ -1,4 +1,4 @@
-﻿<Application x:Class="Fh6Hud.App"
+<Application x:Class="Fh6Hud.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Fh6Hud">
@@ -9,7 +9,7 @@
         <SolidColorBrush x:Key="CardBorderBrush" Color="#663D5267"/>
         <SolidColorBrush x:Key="DividerBrush" Color="#663D5267"/>
         <SolidColorBrush x:Key="ProgressTrackBrush" Color="#66202B3A"/>
-        <SolidColorBrush x:Key="RedlineBrush" Color="#59FF5C5C"/>
+        <SolidColorBrush x:Key="RedlineBrush" Color="#FFFF5C5C"/>
         <SolidColorBrush x:Key="TextBrush" Color="#F2F6FA"/>
         <SolidColorBrush x:Key="SecondaryBrush" Color="#C1CEDB"/>
         <SolidColorBrush x:Key="MutedBrush" Color="#8796A8"/>
