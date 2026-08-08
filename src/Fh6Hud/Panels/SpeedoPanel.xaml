@@ -20,20 +20,20 @@
                 <TextBlock x:Name="GearText"
                            Text="--"
                            FontFamily="{StaticResource DigitFont}"
-                           FontSize="17"
+                           FontSize="20"
                            FontWeight="Bold"
                            Foreground="{StaticResource AccentBrush}"/>
             </Border>
             <TextBlock x:Name="SpeedText"
                        Text="--"
                        FontFamily="{StaticResource DigitFont}"
-                       FontSize="42"
+                       FontSize="46"
                        FontWeight="Bold"
                        Foreground="{StaticResource TextBrush}"
-                       LineHeight="42"/>
+                        LineHeight="46"/>
             <TextBlock Text="KM/H"
                        Foreground="{StaticResource MutedBrush}"
-                       FontSize="11"
+                       FontSize="12"
                        FontWeight="Bold"
                        VerticalAlignment="Bottom"
                        Margin="8,0,0,6"/>

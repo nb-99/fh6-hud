@@ -146,7 +146,7 @@ public abstract class PanelWindow : Window
             return;
         }
 
-        // ToolWindow always (five panel windows must not flood Alt-Tab);
+        // ToolWindow always (six panel windows must not flood Alt-Tab);
         // Transparent only while click-through is on (Layered stays once set,
         // mirroring the original single-window behavior).
         var style = GetWindowLongPtr(handle, GwlExStyle) | WsExToolWindow;
@@ -184,9 +184,12 @@ public abstract class PanelWindow : Window
             return;
         }
 
-        DragMove();
+        MoveWindowForDrag();
         PersistPlacement();
     }
+
+    /// <summary>Moves the window for a left-button drag.</summary>
+    protected virtual void MoveWindowForDrag() => DragMove();
 
     private void PersistPlacement()
     {
@@ -205,13 +208,14 @@ public abstract class PanelWindow : Window
     private static double AnchorOffsetX(PanelAnchor anchor, double width) => anchor switch
     {
         PanelAnchor.TopRight or PanelAnchor.BottomRight => width,
-        PanelAnchor.TopCenter or PanelAnchor.BottomCenter => width / 2,
+        PanelAnchor.TopCenter or PanelAnchor.BottomCenter or PanelAnchor.Center => width / 2,
         _ => 0,
     };
 
     private static double AnchorOffsetY(PanelAnchor anchor, double height) => anchor switch
     {
         PanelAnchor.BottomLeft or PanelAnchor.BottomRight or PanelAnchor.BottomCenter => height,
+        PanelAnchor.Center => height / 2,
         _ => 0,
     };
 

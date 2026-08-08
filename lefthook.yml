@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    validate:
+      run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1
