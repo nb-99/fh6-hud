@@ -53,16 +53,8 @@ public partial class ShiftCuePanel : PanelWindow
             ? Visibility.Visible
             : Visibility.Hidden;
 
-        if (up)
-        {
-            ShiftCueArrow.Text = "▲";
-            ShiftCueText.Text = "UPSHIFT";
-            ShiftCueArrow.Foreground = _hotBrush;
-            ShiftCueText.Foreground = _hotBrush;
-            ShiftCue.Background = _shiftUpFillBrush;
-            ShiftCue.BorderBrush = _hotBrush;
-        }
-        else
+        // A downshift is the actionable cue at low RPM if both latches overlap.
+        if (down)
         {
             ShiftCueArrow.Text = "▼";
             ShiftCueText.Text = "DOWNSHIFT";
@@ -70,6 +62,15 @@ public partial class ShiftCuePanel : PanelWindow
             ShiftCueText.Foreground = _coldBrush;
             ShiftCue.Background = _shiftDownFillBrush;
             ShiftCue.BorderBrush = _coldBrush;
+        }
+        else
+        {
+            ShiftCueArrow.Text = "▲";
+            ShiftCueText.Text = "UPSHIFT";
+            ShiftCueArrow.Foreground = _hotBrush;
+            ShiftCueText.Foreground = _hotBrush;
+            ShiftCue.Background = _shiftUpFillBrush;
+            ShiftCue.BorderBrush = _hotBrush;
         }
     }
 
@@ -85,7 +86,7 @@ public partial class ShiftCuePanel : PanelWindow
 
         Visibility = Visibility.Visible;
         ShiftCue.Visibility = Visibility.Visible;
-        ShiftCueArrow.Text = "▲";
+        ShiftCueArrow.Text = "↕";
         ShiftCueText.Text = "SHIFT CUE";
         ShiftCueArrow.Foreground = _hotBrush;
         ShiftCueText.Foreground = _hotBrush;

@@ -1,9 +1,11 @@
 using System.IO;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Fh6Hud;
+using Fh6Hud.Panels;
 using Fh6Hud.Telemetry;
 
 namespace Fh6Hud.Wpf.Tests;
@@ -46,6 +48,8 @@ public sealed class PanelWindowDragTests
                 Math.Abs((workArea.Left + placement.X * workArea.Width) - (result.FinalLeft + result.Width / 2)),
                 0,
                 1);
+            Assert.Equal("DOWNSHIFT", result.CueText);
+            Assert.Equal("↕", result.PlaceholderArrow);
         }
         finally
         {
@@ -87,9 +91,26 @@ public sealed class PanelWindowDragTests
 
         double finalLeft = panel.Left;
         panel.Close();
+        SeedShiftAdvisor(state);
+        var shiftCue = new ShiftCuePanel(state);
+        var render = typeof(ShiftCuePanel).GetMethod(
+            "Render",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(Fh6Packet) },
+            modifiers: null)!;
+        render.Invoke(shiftCue, new object[] { CreatePacket(gear: 1, rpm: 6500f, accel: 255) });
+        var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
+        SetLiveState(state, downshiftPacket);
+        shiftCue.RenderTick();
+        string cueText = ((TextBlock)shiftCue.FindName("ShiftCueText")!).Text;
+        SetLiveState(state, downshiftPacket, live: false);
+        shiftCue.RenderTick();
+        string placeholderArrow = ((TextBlock)shiftCue.FindName("ShiftCueArrow")!).Text;
+        shiftCue.Close();
         state.Dispose();
         app.Shutdown();
-        return new DragResult(initialLeft, finalLeft, initialX, width);
+        return new DragResult(initialLeft, finalLeft, initialX, width, cueText, placeholderArrow);
     }
 
     private static T RunOnSta<T>(Func<T> action)
@@ -128,6 +149,51 @@ public sealed class PanelWindowDragTests
         }
     }
 
+    private static void SeedShiftAdvisor(HudState state)
+    {
+        const float maxRpm = 7000f;
+        state.PowerCurve.Configure(maxRpm);
+        for (float rpm = 25f; rpm <= maxRpm; rpm += 25f)
+        {
+            float power = rpm <= 5000f
+                ? 120_000f + (rpm - 1000f) * 45f
+                : 300_000f - (rpm - 5000f) * 30f;
+            state.PowerCurve.AddSample(rpm, power);
+        }
+
+        SeedGearRatio(state.GearRatios, gear: 1, rpm: 6000f, speedMs: 20f);
+        SeedGearRatio(state.GearRatios, gear: 2, rpm: 6000f, speedMs: 30f);
+        SeedGearRatio(state.GearRatios, gear: 3, rpm: 6000f, speedMs: 40f);
+        state.ShiftAdvisor.Recalculate(maxRpm);
+    }
+
+    private static void SetLiveState(HudState state, Fh6Packet packet, bool live = true)
+    {
+        typeof(HudState).GetProperty(nameof(HudState.Latest))!.SetValue(state, packet);
+        typeof(HudState).GetProperty(nameof(HudState.LastPacketAtUtc))!.SetValue(state, DateTime.UtcNow);
+        typeof(HudState).GetProperty(nameof(HudState.Live))!.SetValue(state, live);
+    }
+
+    private static void SeedGearRatio(GearRatioTracker tracker, byte gear, float rpm, float speedMs)
+    {
+        var packet = CreatePacket(gear, rpm, accel: 0, speedMs: speedMs);
+        for (int i = 0; i < GearRatioTracker.MinSamplesPerGear; i++)
+        {
+            tracker.AddSample(packet);
+        }
+    }
+
+    private static Fh6Packet CreatePacket(byte gear, float rpm, byte accel, float speedMs = 30f) =>
+        Fh6Packet.Parse(new Fh6PacketBuilder()
+            .IsRaceOn(1)
+            .EngineMaxRpm(7000f)
+            .CurrentEngineRpm(rpm)
+            .SpeedMs(speedMs)
+            .PowerWatts(250_000f)
+            .Accel(accel)
+            .Gear(gear)
+            .Build())!;
+
     private sealed class TestPanel : PanelWindow
     {
         public TestPanel(HudState state)
@@ -156,5 +222,11 @@ public sealed class PanelWindowDragTests
         }
     }
 
-    private readonly record struct DragResult(double InitialLeft, double FinalLeft, double InitialX, double Width);
+    private readonly record struct DragResult(
+        double InitialLeft,
+        double FinalLeft,
+        double InitialX,
+        double Width,
+        string CueText,
+        string PlaceholderArrow);
 }
