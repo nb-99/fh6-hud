@@ -53,30 +53,30 @@ public partial class ShiftCuePanel : PanelWindow
         }
 
         Visibility = Visibility.Visible;
-        ShiftCue.Visibility = (Environment.TickCount64 / 200) % 2 == 0
+        ShiftPlaceholder.Visibility = Visibility.Collapsed;
+        ShiftLight.Visibility = (Environment.TickCount64 / 200) % 2 == 0
             ? Visibility.Visible
             : Visibility.Hidden;
-        ShiftCueArrow.Visibility = Visibility.Visible;
 
         // Preserve the original engine-panel arbitration: upshift wins when
         // both stateful advisor latches overlap, otherwise show downshift.
         if (up)
         {
-            ShiftCueArrow.Text = "▲";
-            ShiftCueText.Text = "UPSHIFT";
-            ShiftCueArrow.Foreground = _hotBrush;
-            ShiftCueText.Foreground = _hotBrush;
-            ShiftCue.Background = _shiftUpFillBrush;
-            ShiftCue.BorderBrush = _hotBrush;
+            ShiftLightArrow.Text = "▲";
+            ShiftLightText.Text = "UPSHIFT";
+            ShiftLightArrow.Foreground = _hotBrush;
+            ShiftLightText.Foreground = _hotBrush;
+            ShiftLight.Background = _shiftUpFillBrush;
+            ShiftLight.BorderBrush = _hotBrush;
         }
         else
         {
-            ShiftCueArrow.Text = "▼";
-            ShiftCueText.Text = "DOWNSHIFT";
-            ShiftCueArrow.Foreground = _coldBrush;
-            ShiftCueText.Foreground = _coldBrush;
-            ShiftCue.Background = _shiftDownFillBrush;
-            ShiftCue.BorderBrush = _coldBrush;
+            ShiftLightArrow.Text = "▼";
+            ShiftLightText.Text = "DOWNSHIFT";
+            ShiftLightArrow.Foreground = _coldBrush;
+            ShiftLightText.Foreground = _coldBrush;
+            ShiftLight.Background = _shiftDownFillBrush;
+            ShiftLight.BorderBrush = _coldBrush;
         }
     }
 
@@ -91,13 +91,13 @@ public partial class ShiftCuePanel : PanelWindow
         }
 
         Visibility = Visibility.Visible;
-        ShiftCue.Visibility = Visibility.Visible;
-        ShiftCueArrow.Visibility = Visibility.Hidden;
-        ShiftCueArrow.Text = "↕";
-        ShiftCueText.Text = "SHIFT CUE";
-        ShiftCueArrow.Foreground = _mutedBrush;
-        ShiftCueText.Foreground = _mutedBrush;
-        ShiftCue.Background = _cardBrush;
-        ShiftCue.BorderBrush = _mutedBrush;
+        ShiftLight.Visibility = Visibility.Collapsed;
+        ShiftPlaceholder.Visibility = Visibility.Visible;
+        PlaceholderArrow.Text = "↕";
+        PlaceholderText.Text = "SHIFT CUE";
+        PlaceholderArrow.Foreground = _mutedBrush;
+        PlaceholderText.Foreground = _mutedBrush;
+        ShiftPlaceholder.Background = _cardBrush;
+        ShiftPlaceholder.BorderBrush = _mutedBrush;
     }
 }

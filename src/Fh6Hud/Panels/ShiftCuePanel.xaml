@@ -3,26 +3,53 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:fh6="clr-namespace:Fh6Hud"
                  Title="FH6 HUD Shift Cue">
-    <Border x:Name="ShiftCue"
-            Background="{StaticResource ShiftUpFillBrush}"
-            BorderBrush="{StaticResource HotBrush}"
-            BorderThickness="1"
-            CornerRadius="8"
-            Padding="12,7">
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-            <TextBlock x:Name="ShiftCueArrow"
-                       Text="▲"
-                       FontFamily="Segoe UI Symbol"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Foreground="{StaticResource HotBrush}"/>
-            <TextBlock x:Name="ShiftCueText"
-                       Text="UPSHIFT"
-                       FontSize="14"
-                       FontWeight="Bold"
-                       Foreground="{StaticResource HotBrush}"
-                       VerticalAlignment="Center"
-                       Margin="9,0,0,0"/>
-        </StackPanel>
-    </Border>
+    <Grid>
+        <Border x:Name="ShiftPlaceholder"
+                Visibility="Collapsed"
+                Background="{StaticResource CardBrush}"
+                BorderBrush="{StaticResource MutedBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12,7">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock x:Name="PlaceholderArrow"
+                           Text="↕"
+                           FontFamily="Segoe UI Symbol"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource MutedBrush}"/>
+                <TextBlock x:Name="PlaceholderText"
+                           Text="SHIFT CUE"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource MutedBrush}"
+                           VerticalAlignment="Center"
+                           Margin="9,0,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="ShiftLight"
+                Visibility="Collapsed"
+                Background="{StaticResource ShiftUpFillBrush}"
+                BorderBrush="{StaticResource HotBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12,7">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock x:Name="ShiftLightArrow"
+                           Text="▲"
+                           FontFamily="Segoe UI Symbol"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource HotBrush}"/>
+                <TextBlock x:Name="ShiftLightText"
+                           Text="UPSHIFT"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource HotBrush}"
+                           VerticalAlignment="Center"
+                           Margin="9,0,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
 </fh6:PanelWindow>

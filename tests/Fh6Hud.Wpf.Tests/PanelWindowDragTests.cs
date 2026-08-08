@@ -50,8 +50,11 @@ public sealed class PanelWindowDragTests
                 1);
             Assert.Equal("UPSHIFT", result.UpCueText);
             Assert.Equal("DOWNSHIFT", result.CueText);
+            Assert.True(result.UpUsesDedicatedPill);
+            Assert.True(result.DownUsesDedicatedPill);
             Assert.Equal(Visibility.Visible, result.ClickThroughCueVisibility);
-            Assert.Equal(Visibility.Hidden, result.PlaceholderArrowVisibility);
+            Assert.True(result.PlaceholderUsesSeparatePill);
+            Assert.Equal(Visibility.Visible, result.PlaceholderArrowVisibility);
         }
         finally
         {
@@ -104,18 +107,27 @@ public sealed class PanelWindowDragTests
             types: new[] { typeof(Fh6Packet) },
             modifiers: null)!;
         render.Invoke(shiftCue, new object[] { CreatePacket(gear: 1, rpm: 6500f, accel: 255) });
-        string upCueText = ((TextBlock)shiftCue.FindName("ShiftCueText")!).Text;
+        string upCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        bool upUsesDedicatedPill = ReferenceEquals(
+            shiftCue.FindResource("ShiftUpFillBrush"),
+            ((Border)shiftCue.FindName("ShiftLight")!).Background);
         var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
         SetLiveState(state, downshiftPacket);
         shiftCue.RenderTick();
-        string cueText = ((TextBlock)shiftCue.FindName("ShiftCueText")!).Text;
+        string cueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        bool downUsesDedicatedPill = ReferenceEquals(
+            shiftCue.FindResource("ShiftDownFillBrush"),
+            ((Border)shiftCue.FindName("ShiftLight")!).Background);
         PanelWindow.ToggleClickThroughAll();
         shiftCue.RenderTick();
         Visibility clickThroughCueVisibility = shiftCue.Visibility;
         PanelWindow.ToggleClickThroughAll();
         SetLiveState(state, downshiftPacket, live: false);
         shiftCue.RenderTick();
-        Visibility placeholderArrowVisibility = ((TextBlock)shiftCue.FindName("ShiftCueArrow")!).Visibility;
+        Visibility placeholderArrowVisibility = ((TextBlock)shiftCue.FindName("PlaceholderArrow")!).Visibility;
+        bool placeholderUsesSeparatePill =
+            ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility == Visibility.Visible
+            && ((Border)shiftCue.FindName("ShiftLight")!).Visibility == Visibility.Collapsed;
         shiftCue.Close();
         state.Dispose();
         app.Shutdown();
@@ -126,7 +138,10 @@ public sealed class PanelWindowDragTests
             width,
             upCueText,
             cueText,
+            upUsesDedicatedPill,
+            downUsesDedicatedPill,
             clickThroughCueVisibility,
+            placeholderUsesSeparatePill,
             placeholderArrowVisibility);
     }
 
@@ -246,6 +261,9 @@ public sealed class PanelWindowDragTests
         double Width,
         string UpCueText,
         string CueText,
+        bool UpUsesDedicatedPill,
+        bool DownUsesDedicatedPill,
         Visibility ClickThroughCueVisibility,
+        bool PlaceholderUsesSeparatePill,
         Visibility PlaceholderArrowVisibility);
 }
