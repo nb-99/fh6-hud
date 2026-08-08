@@ -48,8 +48,10 @@ public sealed class PanelWindowDragTests
                 Math.Abs((workArea.Left + placement.X * workArea.Width) - (result.FinalLeft + result.Width / 2)),
                 0,
                 1);
+            Assert.Equal("UPSHIFT", result.UpCueText);
             Assert.Equal("DOWNSHIFT", result.CueText);
-            Assert.Equal("↕", result.PlaceholderArrow);
+            Assert.Equal(Visibility.Visible, result.ClickThroughCueVisibility);
+            Assert.Equal(Visibility.Hidden, result.PlaceholderArrowVisibility);
         }
         finally
         {
@@ -93,6 +95,8 @@ public sealed class PanelWindowDragTests
         panel.Close();
         SeedShiftAdvisor(state);
         var shiftCue = new ShiftCuePanel(state);
+        shiftCue.Show();
+        shiftCue.UpdateLayout();
         var render = typeof(ShiftCuePanel).GetMethod(
             "Render",
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -100,17 +104,30 @@ public sealed class PanelWindowDragTests
             types: new[] { typeof(Fh6Packet) },
             modifiers: null)!;
         render.Invoke(shiftCue, new object[] { CreatePacket(gear: 1, rpm: 6500f, accel: 255) });
+        string upCueText = ((TextBlock)shiftCue.FindName("ShiftCueText")!).Text;
         var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
         SetLiveState(state, downshiftPacket);
         shiftCue.RenderTick();
         string cueText = ((TextBlock)shiftCue.FindName("ShiftCueText")!).Text;
+        PanelWindow.ToggleClickThroughAll();
+        shiftCue.RenderTick();
+        Visibility clickThroughCueVisibility = shiftCue.Visibility;
+        PanelWindow.ToggleClickThroughAll();
         SetLiveState(state, downshiftPacket, live: false);
         shiftCue.RenderTick();
-        string placeholderArrow = ((TextBlock)shiftCue.FindName("ShiftCueArrow")!).Text;
+        Visibility placeholderArrowVisibility = ((TextBlock)shiftCue.FindName("ShiftCueArrow")!).Visibility;
         shiftCue.Close();
         state.Dispose();
         app.Shutdown();
-        return new DragResult(initialLeft, finalLeft, initialX, width, cueText, placeholderArrow);
+        return new DragResult(
+            initialLeft,
+            finalLeft,
+            initialX,
+            width,
+            upCueText,
+            cueText,
+            clickThroughCueVisibility,
+            placeholderArrowVisibility);
     }
 
     private static T RunOnSta<T>(Func<T> action)
@@ -227,6 +244,8 @@ public sealed class PanelWindowDragTests
         double FinalLeft,
         double InitialX,
         double Width,
+        string UpCueText,
         string CueText,
-        string PlaceholderArrow);
+        Visibility ClickThroughCueVisibility,
+        Visibility PlaceholderArrowVisibility);
 }

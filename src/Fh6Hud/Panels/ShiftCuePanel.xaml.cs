@@ -19,6 +19,8 @@ public partial class ShiftCuePanel : PanelWindow
 
     private readonly SolidColorBrush _coldBrush;
     private readonly SolidColorBrush _hotBrush;
+    private readonly SolidColorBrush _mutedBrush;
+    private readonly SolidColorBrush _cardBrush;
     private readonly SolidColorBrush _shiftUpFillBrush;
     private readonly SolidColorBrush _shiftDownFillBrush;
 
@@ -29,6 +31,8 @@ public partial class ShiftCuePanel : PanelWindow
 
         _coldBrush = (SolidColorBrush)FindResource("ColdBrush");
         _hotBrush = (SolidColorBrush)FindResource("HotBrush");
+        _mutedBrush = (SolidColorBrush)FindResource("MutedBrush");
+        _cardBrush = (SolidColorBrush)FindResource("CardBrush");
         _shiftUpFillBrush = (SolidColorBrush)FindResource("ShiftUpFillBrush");
         _shiftDownFillBrush = (SolidColorBrush)FindResource("ShiftDownFillBrush");
     }
@@ -52,18 +56,11 @@ public partial class ShiftCuePanel : PanelWindow
         ShiftCue.Visibility = (Environment.TickCount64 / 200) % 2 == 0
             ? Visibility.Visible
             : Visibility.Hidden;
+        ShiftCueArrow.Visibility = Visibility.Visible;
 
-        // A downshift is the actionable cue at low RPM if both latches overlap.
-        if (down)
-        {
-            ShiftCueArrow.Text = "▼";
-            ShiftCueText.Text = "DOWNSHIFT";
-            ShiftCueArrow.Foreground = _coldBrush;
-            ShiftCueText.Foreground = _coldBrush;
-            ShiftCue.Background = _shiftDownFillBrush;
-            ShiftCue.BorderBrush = _coldBrush;
-        }
-        else
+        // Preserve the original engine-panel arbitration: upshift wins when
+        // both stateful advisor latches overlap, otherwise show downshift.
+        if (up)
         {
             ShiftCueArrow.Text = "▲";
             ShiftCueText.Text = "UPSHIFT";
@@ -71,6 +68,15 @@ public partial class ShiftCuePanel : PanelWindow
             ShiftCueText.Foreground = _hotBrush;
             ShiftCue.Background = _shiftUpFillBrush;
             ShiftCue.BorderBrush = _hotBrush;
+        }
+        else
+        {
+            ShiftCueArrow.Text = "▼";
+            ShiftCueText.Text = "DOWNSHIFT";
+            ShiftCueArrow.Foreground = _coldBrush;
+            ShiftCueText.Foreground = _coldBrush;
+            ShiftCue.Background = _shiftDownFillBrush;
+            ShiftCue.BorderBrush = _coldBrush;
         }
     }
 
@@ -86,11 +92,12 @@ public partial class ShiftCuePanel : PanelWindow
 
         Visibility = Visibility.Visible;
         ShiftCue.Visibility = Visibility.Visible;
+        ShiftCueArrow.Visibility = Visibility.Hidden;
         ShiftCueArrow.Text = "↕";
         ShiftCueText.Text = "SHIFT CUE";
-        ShiftCueArrow.Foreground = _hotBrush;
-        ShiftCueText.Foreground = _hotBrush;
-        ShiftCue.Background = _shiftUpFillBrush;
-        ShiftCue.BorderBrush = _hotBrush;
+        ShiftCueArrow.Foreground = _mutedBrush;
+        ShiftCueText.Foreground = _mutedBrush;
+        ShiftCue.Background = _cardBrush;
+        ShiftCue.BorderBrush = _mutedBrush;
     }
 }
