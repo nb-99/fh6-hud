@@ -1,15 +1,15 @@
 {
-  "Port": 45000,
-  "DebugLog": false,
-  "TireCompound": "Rally",
-  "TireOptMinC": 72.0,
-  "TireOptMaxC": 90.0,
-  "Panels": {
-    "Tires": { "X": 0.20, "Y": 0.80, "Anchor": "BottomLeft" },
-    "Engine": { "X": 0.80, "Y": 0.80, "Anchor": "BottomRight" },
-    "Intervals": { "X": 1.00, "Y": 0.25, "Anchor": "TopRight" },
-    "Speedo": { "X": 1.00, "Y": 0.42, "Anchor": "TopRight" },
-    "Status": { "X": 0.50, "Y": 0.92, "Anchor": "BottomCenter" },
-    "ShiftCue": { "X": 0.50, "Y": 0.50, "Anchor": "Center" }
-  }
+    "Port": 45000,
+    "DebugLog": false,
+    "TireCompound": "Rally",
+    "TireOptMinC": 72.0,
+    "TireOptMaxC": 90.0,
+    "Panels": {
+        "Tires": { "X": 0.2, "Y": 0.8, "Anchor": "BottomLeft" },
+        "Engine": { "X": 0.8, "Y": 0.8, "Anchor": "BottomRight" },
+        "Intervals": { "X": 1.0, "Y": 0.25, "Anchor": "TopRight" },
+        "Speedo": { "X": 1.0, "Y": 0.42, "Anchor": "TopRight" },
+        "Status": { "X": 0.5, "Y": 0.92, "Anchor": "BottomCenter" },
+        "ShiftCue": { "X": 0.5, "Y": 0.5, "Anchor": "Center" }
+    }
 }

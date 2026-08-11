@@ -313,3 +313,4 @@ S8 NormalizedAIBrakeDifference;
 - Forza Horizon 6 includes three fields not present in Forza Motorsport: `CarGroup`, `SmashableVelDiff`, and `SmashableMass`. These are inserted after `NumCylinders` and before `PositionX`.
 - Forza Horizon 6 does not include `TireWear` or `TrackOrdinal` fields that are present in Forza Motorsport's "Dash" format.
 - FH6 tire-temperature values are observed as Fahrenheit-like raw values. Convert to Celsius with `(raw - 32) * 5 / 9`; for example, raw `140` is `60 C`.
+- FH6 observed gear values are `0` for reverse, `1` through `10` for forward gears, and `11` for neutral. Do not learn ratios from values outside `1` through `10`.

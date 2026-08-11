@@ -65,8 +65,8 @@ must land first.
     if ever needed.
 
 - [x] **UI-2 — Gear readout** *(S, rescoped)*
-  - Gear chip next to the speed readout. Mapping (0=N, 20=R, 21=D, 22=P) is
-    inferred from earlier titles — verify against live data before shipping.
+  - Gear chip next to the speed readout. FH6 observed mapping is 0=R,
+    1-10=forward gears, and 11=N; values outside that range are not learned.
   - Boost/fuel/torque **declined for now** (panel space); revisit if panels
     become customizable.
 

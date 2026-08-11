@@ -12,7 +12,14 @@
 
 ## [x] Hooks and CI for linting, validations etc — resolved in issue #4
 
-## [ ] Conifigurable Panels
+## [ ] Makefile
+
+**make build:** builds the exe
+**make run:** builds + runs the exe
+**make dev:** runs the devbuild
+**make test:** runs tests
+
+## [ ] Configurable Panels
 
 **Hideable:** Panels should be individually hideable/deactivatable, either manually or by certain conditions (e.g. when tire temp has not changed in the last 10 secs e.g. when in the tuning menu, hide the tire temp panel)
 **Resizable:** Panels should be resizable via dragging their edges and their size persisted alongside their position in config.json

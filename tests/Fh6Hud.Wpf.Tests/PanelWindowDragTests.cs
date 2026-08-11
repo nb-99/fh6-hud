@@ -51,12 +51,24 @@ public sealed class PanelWindowDragTests
             Assert.Equal("UPSHIFT", result.LiveCue.UpCueText);
             Assert.Equal(Visibility.Visible, result.LiveCue.UpVisibility);
             Assert.Equal(Visibility.Collapsed, result.LiveCue.UpPlaceholderVisibility);
-            Assert.True(result.LiveCue.UpUsesDedicatedPill);
             Assert.Equal("DOWNSHIFT", result.LiveCue.DownCueText);
+            Assert.Equal("UPSHIFT", result.LiveCue.OverlapCueText);
+            Assert.Equal("\u25B2", result.LiveCue.UpCueArrow);
+            Assert.Equal("\u25BC", result.LiveCue.DownCueArrow);
+            Assert.Equal(Visibility.Visible, result.LiveCue.UpCueVisibility);
+            Assert.Equal(Visibility.Visible, result.LiveCue.DownCueVisibility);
+            Assert.True(result.LiveCue.SimulatorSawUpshift);
+            Assert.True(result.LiveCue.UpUsesDedicatedPill);
             Assert.Equal(Visibility.Visible, result.LiveCue.DownVisibility);
             Assert.Equal(Visibility.Collapsed, result.LiveCue.DownPlaceholderVisibility);
             Assert.True(result.LiveCue.DownUsesDedicatedPill);
-            Assert.Equal(Visibility.Hidden, result.LiveCue.BlinkVisibility);
+            Assert.Equal(Visibility.Visible, result.LiveCue.BlinkVisibility);
+            Assert.Equal(0, result.LiveCue.BlinkOpacity);
+            Assert.Equal(Visibility.Visible, result.LiveCue.ClickThroughLightVisibility);
+            Assert.Equal(0, result.LiveCue.ClickThroughLightOpacity);
+            Assert.Equal(Visibility.Visible, result.LiveCue.ClickThroughCueVisibility);
+            Assert.True(result.LiveCue.PlaceholderUsesSeparatePill);
+            Assert.Equal(Visibility.Visible, result.LiveCue.PlaceholderArrowVisibility);
 
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderWindowVisibility);
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderVisibility);
@@ -132,10 +144,10 @@ public sealed class PanelWindowDragTests
         var shiftCue = new ShiftCuePanel(state, () => clock);
         shiftCue.Show();
         shiftCue.UpdateLayout();
-
         SetLiveState(state, CreatePacket(gear: 1, rpm: 6500f, accel: 255));
         shiftCue.RenderTick();
         string upCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string upCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
         Visibility upVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
         Visibility upPlaceholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
         bool upUsesDedicatedPill = ReferenceEquals(
@@ -145,29 +157,62 @@ public sealed class PanelWindowDragTests
         clock += 200;
         shiftCue.RenderTick();
         Visibility blinkVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        double blinkOpacity = ((Border)shiftCue.FindName("ShiftLight")!).Opacity;
 
         clock += 200;
-        SetLiveState(state, CreatePacket(gear: 2, rpm: 3800f, accel: 255));
+        var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
+        SetLiveState(state, downshiftPacket);
         shiftCue.RenderTick();
         string downCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string downCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
         Visibility downVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
         Visibility downPlaceholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
         bool downUsesDedicatedPill = ReferenceEquals(
             shiftCue.FindResource("ShiftDownFillBrush"),
             ((Border)shiftCue.FindName("ShiftLight")!).Background);
 
+        ForceOverlappingAdvisorState(state.ShiftAdvisor);
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 3500f, accel: 255));
+        shiftCue.RenderTick();
+        string overlapCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        bool simulatorSawUpshift = ReplaySimulator(state, shiftCue);
+        clock += 200;
+        PanelWindow.ToggleClickThroughAll();
+        shiftCue.RenderTick();
+        Visibility clickThroughCueVisibility = shiftCue.Visibility;
+        Visibility clickThroughLightVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        double clickThroughLightOpacity = ((Border)shiftCue.FindName("ShiftLight")!).Opacity;
+        PanelWindow.ToggleClickThroughAll();
+        SetLiveState(state, downshiftPacket, live: false);
+        shiftCue.RenderTick();
+        Visibility placeholderArrowVisibility = ((TextBlock)shiftCue.FindName("PlaceholderArrow")!).Visibility;
+        bool placeholderUsesSeparatePill =
+            ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility == Visibility.Visible
+            && ((Border)shiftCue.FindName("ShiftLight")!).Visibility == Visibility.Collapsed;
         shiftCue.Close();
         state.Dispose();
         return new ShiftCueResult(
             upCueText,
             upVisibility,
             upPlaceholderVisibility,
+            overlapCueText,
+            upCueArrow,
+            downCueArrow,
+            upVisibility,
+            downVisibility,
+            simulatorSawUpshift,
             upUsesDedicatedPill,
             downCueText,
             downVisibility,
             downPlaceholderVisibility,
             downUsesDedicatedPill,
-            blinkVisibility);
+            blinkVisibility,
+            blinkOpacity,
+            clickThroughCueVisibility,
+            clickThroughLightVisibility,
+            clickThroughLightOpacity,
+            placeholderUsesSeparatePill,
+            placeholderArrowVisibility);
     }
 
     private static ShiftCueModeResult RenderShiftCueModes()
@@ -204,6 +249,42 @@ public sealed class PanelWindowDragTests
         {
             PanelWindow.ToggleClickThroughAll();
         }
+    }
+
+    private static void ForceOverlappingAdvisorState(ShiftPointAdvisor advisor)
+    {
+        var shiftRpmByGear = (Dictionary<int, float>)typeof(ShiftPointAdvisor)
+            .GetField("_shiftRpmByGear", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(advisor)!;
+        shiftRpmByGear[2] = 3000f;
+        typeof(ShiftPointAdvisor).GetField("_downLatched", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(advisor, true);
+        typeof(ShiftPointAdvisor).GetField("_downLatchedGear", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(advisor, 2);
+    }
+
+    private static bool ReplaySimulator(HudState state, ShiftCuePanel shiftCue)
+    {
+        state.PowerCurve.Reset();
+        state.GearRatios.Reset();
+        state.ShiftAdvisor.ResetLatch();
+        for (int sample = 0; sample < 18 * 60; sample++)
+        {
+            double seconds = sample / 60d;
+            var packet = CreateSimulatorPacket(seconds);
+            SetLiveState(state, packet);
+            state.Tick();
+            shiftCue.RenderTick();
+
+            var light = (Border)shiftCue.FindName("ShiftLight")!;
+            var text = (TextBlock)shiftCue.FindName("ShiftLightText")!;
+            if (text.Text == "UPSHIFT" && light.Visibility == Visibility.Visible)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static T RunOnSta<T>(Func<T> action)
@@ -287,6 +368,45 @@ public sealed class PanelWindowDragTests
             .Gear(gear)
             .Build())!;
 
+    private static Fh6Packet CreateSimulatorPacket(double seconds)
+    {
+        const float maxRpm = 7000f;
+        const float simShiftRpm = 6900f;
+        float[] gearTopSpeedMs = { 22.5f, 34.8f, 47.8f, 61.2f, 76.5f, 90f };
+        double cycle = seconds % 10.0;
+        float speed = cycle switch
+        {
+            < 0.5 => 0f,
+            < 7.5 => (float)((cycle - 0.5) / 7.0 * 90f),
+            < 8.5 => 90f,
+            _ => (float)(90f * (1 - (cycle - 8.5) / 1.5)),
+        };
+
+        int gear = 1;
+        while (gear < gearTopSpeedMs.Length
+               && speed > gearTopSpeedMs[gear - 1] * (simShiftRpm / maxRpm))
+        {
+            gear++;
+        }
+
+        float topSpeed = gearTopSpeedMs[Math.Clamp(gear - 1, 0, gearTopSpeedMs.Length - 1)];
+        float rpm = speed < 0.1f ? 900f : Math.Max(900f, speed / topSpeed * maxRpm);
+        float power = rpm <= 5600f
+            ? 150_000f + (rpm - 1000f) * ((320_000f - 150_000f) / 4600f)
+            : 320_000f * (1f - 0.18f * (rpm - 5600f) / 1400f);
+
+        return Fh6Packet.Parse(new Fh6PacketBuilder()
+            .IsRaceOn(1)
+            .TimestampMs((uint)(seconds * 1000) % 1_000_000u)
+            .EngineMaxRpm(maxRpm)
+            .CurrentEngineRpm(rpm)
+            .SpeedMs(speed)
+            .PowerWatts(power)
+            .Accel(255)
+            .Gear((byte)gear)
+            .Build())!;
+    }
+
     private sealed class TestPanel : PanelWindow
     {
         public TestPanel(HudState state)
@@ -330,12 +450,24 @@ public sealed class PanelWindowDragTests
         string UpCueText,
         Visibility UpVisibility,
         Visibility UpPlaceholderVisibility,
+        string OverlapCueText,
+        string UpCueArrow,
+        string DownCueArrow,
+        Visibility UpCueVisibility,
+        Visibility DownCueVisibility,
+        bool SimulatorSawUpshift,
         bool UpUsesDedicatedPill,
         string DownCueText,
         Visibility DownVisibility,
         Visibility DownPlaceholderVisibility,
         bool DownUsesDedicatedPill,
-        Visibility BlinkVisibility);
+        Visibility BlinkVisibility,
+        double BlinkOpacity,
+        Visibility ClickThroughCueVisibility,
+        Visibility ClickThroughLightVisibility,
+        double ClickThroughLightOpacity,
+        bool PlaceholderUsesSeparatePill,
+        Visibility PlaceholderArrowVisibility);
 
     private readonly record struct ShiftCueModeResult(
         Visibility PlaceholderWindowVisibility,
