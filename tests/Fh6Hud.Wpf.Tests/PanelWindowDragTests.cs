@@ -50,6 +50,12 @@ public sealed class PanelWindowDragTests
                 1);
             Assert.Equal("UPSHIFT", result.UpCueText);
             Assert.Equal("DOWNSHIFT", result.CueText);
+            Assert.Equal("UPSHIFT", result.OverlapCueText);
+            Assert.Equal("▲", result.UpCueArrow);
+            Assert.Equal("▼", result.DownCueArrow);
+            Assert.Equal(Visibility.Visible, result.UpCueVisibility);
+            Assert.Equal(Visibility.Visible, result.DownCueVisibility);
+            Assert.True(result.SimulatorSawUpshift);
             Assert.True(result.UpUsesDedicatedPill);
             Assert.True(result.DownUsesDedicatedPill);
             Assert.Equal(Visibility.Visible, result.ClickThroughCueVisibility);
@@ -106,18 +112,30 @@ public sealed class PanelWindowDragTests
             binder: null,
             types: new[] { typeof(Fh6Packet) },
             modifiers: null)!;
+        WaitForVisibleBlinkPhase();
         render.Invoke(shiftCue, new object[] { CreatePacket(gear: 1, rpm: 6500f, accel: 255) });
         string upCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string upCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
+        Visibility upCueVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
         bool upUsesDedicatedPill = ReferenceEquals(
             shiftCue.FindResource("ShiftUpFillBrush"),
             ((Border)shiftCue.FindName("ShiftLight")!).Background);
         var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
         SetLiveState(state, downshiftPacket);
+        WaitForVisibleBlinkPhase();
         shiftCue.RenderTick();
         string cueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string downCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
+        Visibility downCueVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
         bool downUsesDedicatedPill = ReferenceEquals(
             shiftCue.FindResource("ShiftDownFillBrush"),
             ((Border)shiftCue.FindName("ShiftLight")!).Background);
+        ForceOverlappingAdvisorState(state.ShiftAdvisor);
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 3500f, accel: 255));
+        WaitForVisibleBlinkPhase();
+        shiftCue.RenderTick();
+        string overlapCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        bool simulatorSawUpshift = ReplaySimulator(state, shiftCue);
         PanelWindow.ToggleClickThroughAll();
         shiftCue.RenderTick();
         Visibility clickThroughCueVisibility = shiftCue.Visibility;
@@ -138,11 +156,61 @@ public sealed class PanelWindowDragTests
             width,
             upCueText,
             cueText,
+            overlapCueText,
+            upCueArrow,
+            downCueArrow,
+            upCueVisibility,
+            downCueVisibility,
+            simulatorSawUpshift,
             upUsesDedicatedPill,
             downUsesDedicatedPill,
             clickThroughCueVisibility,
             placeholderUsesSeparatePill,
             placeholderArrowVisibility);
+    }
+
+    private static void WaitForVisibleBlinkPhase()
+    {
+        while ((Environment.TickCount64 / 200) % 2 != 0)
+        {
+            Thread.Sleep(5);
+        }
+    }
+
+    private static void ForceOverlappingAdvisorState(ShiftPointAdvisor advisor)
+    {
+        var shiftRpmByGear = (Dictionary<int, float>)typeof(ShiftPointAdvisor)
+            .GetField("_shiftRpmByGear", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(advisor)!;
+        shiftRpmByGear[2] = 3000f;
+        typeof(ShiftPointAdvisor).GetField("_downLatched", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(advisor, true);
+        typeof(ShiftPointAdvisor).GetField("_downLatchedGear", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(advisor, 2);
+    }
+
+    private static bool ReplaySimulator(HudState state, ShiftCuePanel shiftCue)
+    {
+        state.PowerCurve.Reset();
+        state.GearRatios.Reset();
+        state.ShiftAdvisor.ResetLatch();
+        for (int sample = 0; sample < 18 * 60; sample++)
+        {
+            double seconds = sample / 60d;
+            var packet = CreateSimulatorPacket(seconds);
+            SetLiveState(state, packet);
+            state.Tick();
+            shiftCue.RenderTick();
+
+            var light = (Border)shiftCue.FindName("ShiftLight")!;
+            var text = (TextBlock)shiftCue.FindName("ShiftLightText")!;
+            if (text.Text == "UPSHIFT" && light.Visibility == Visibility.Visible)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static T RunOnSta<T>(Func<T> action)
@@ -226,6 +294,45 @@ public sealed class PanelWindowDragTests
             .Gear(gear)
             .Build())!;
 
+    private static Fh6Packet CreateSimulatorPacket(double seconds)
+    {
+        const float maxRpm = 7000f;
+        const float simShiftRpm = 6900f;
+        float[] gearTopSpeedMs = { 22.5f, 34.8f, 47.8f, 61.2f, 76.5f, 90f };
+        double cycle = seconds % 10.0;
+        float speed = cycle switch
+        {
+            < 0.5 => 0f,
+            < 7.5 => (float)((cycle - 0.5) / 7.0 * 90f),
+            < 8.5 => 90f,
+            _ => (float)(90f * (1 - (cycle - 8.5) / 1.5)),
+        };
+
+        int gear = 1;
+        while (gear < gearTopSpeedMs.Length
+               && speed > gearTopSpeedMs[gear - 1] * (simShiftRpm / maxRpm))
+        {
+            gear++;
+        }
+
+        float topSpeed = gearTopSpeedMs[Math.Clamp(gear - 1, 0, gearTopSpeedMs.Length - 1)];
+        float rpm = speed < 0.1f ? 900f : Math.Max(900f, speed / topSpeed * maxRpm);
+        float power = rpm <= 5600f
+            ? 150_000f + (rpm - 1000f) * ((320_000f - 150_000f) / 4600f)
+            : 320_000f * (1f - 0.18f * (rpm - 5600f) / 1400f);
+
+        return Fh6Packet.Parse(new Fh6PacketBuilder()
+            .IsRaceOn(1)
+            .TimestampMs((uint)(seconds * 1000) % 1_000_000u)
+            .EngineMaxRpm(maxRpm)
+            .CurrentEngineRpm(rpm)
+            .SpeedMs(speed)
+            .PowerWatts(power)
+            .Accel(255)
+            .Gear((byte)gear)
+            .Build())!;
+    }
+
     private sealed class TestPanel : PanelWindow
     {
         public TestPanel(HudState state)
@@ -261,6 +368,12 @@ public sealed class PanelWindowDragTests
         double Width,
         string UpCueText,
         string CueText,
+        string OverlapCueText,
+        string UpCueArrow,
+        string DownCueArrow,
+        Visibility UpCueVisibility,
+        Visibility DownCueVisibility,
+        bool SimulatorSawUpshift,
         bool UpUsesDedicatedPill,
         bool DownUsesDedicatedPill,
         Visibility ClickThroughCueVisibility,

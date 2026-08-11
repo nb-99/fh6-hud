@@ -16,6 +16,9 @@ namespace Fh6Hud.Telemetry;
 /// </remarks>
 public sealed class GearRatioTracker
 {
+    /// <summary>Highest forward gear represented by FH6 Data Out telemetry.</summary>
+    public const byte MaxForwardGear = 10;
+
     /// <summary>Samples per gear before the mean saturates (~3.3s at 60 Hz in one gear).</summary>
     public const int MaxSamplesPerGear = 200;
 
@@ -40,11 +43,11 @@ public sealed class GearRatioTracker
     public int Version => _version;
 
     /// <summary>
-    /// True for gears the HUD can reason about: forward manual gears 1-19.
-    /// 0 = neutral, 20 = reverse, 21 = drive (D — the actual gear is not
-    /// reported, so no ratio can be learned), 22 = park, as in earlier titles.
+    /// True for gears the HUD can reason about: forward manual gears 1-10.
+    /// FH6 reports reverse as 0 and neutral as 11; values above 10 are not
+    /// forward gears and must not contaminate ratio learning.
     /// </summary>
-    public static bool IsLearnableGear(byte gear) => gear is >= 1 and < 20;
+    public static bool IsLearnableGear(byte gear) => gear is >= 1 and <= MaxForwardGear;
 
     /// <summary>Records one telemetry packet. Returns true when the sample was accepted.</summary>
     public bool AddSample(Fh6Packet packet)

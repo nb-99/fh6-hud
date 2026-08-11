@@ -79,7 +79,7 @@ public sealed class ShiftPointAdvisor
         }
 
         float peakRpm = PeakPowerRpm();
-        for (int gear = 1; gear < 19; gear++)
+        for (int gear = 1; gear < GearRatioTracker.MaxForwardGear; gear++)
         {
             float? shift = ComputeShiftRpm(gear, peakRpm, maxRpm);
             if (shift is { } rpm)

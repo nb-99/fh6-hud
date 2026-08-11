@@ -18,16 +18,13 @@ public partial class SpeedoPanel : PanelWindow
     }
 
     /// <summary>
-    /// Maps the raw gear byte to a display label. 0 = neutral, 20 = reverse,
-    /// 21 = drive (D), 22 = park (P) — inherited from earlier Forza titles;
-    /// verify against live FH6 data before relying on these values.
+    /// Maps the raw FH6 gear byte to a display label. FH6 reports reverse as
+    /// 0 and neutral as 11; forward gears are reported as 1 through 10.
     /// </summary>
     private static string GearLabel(byte gear) => gear switch
     {
-        0 => "N",
-        20 => "R",
-        21 => "D",
-        22 => "P",
+        0 => "R",
+        11 => "N",
         _ => gear.ToString(),
     };
 }

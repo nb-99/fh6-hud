@@ -31,8 +31,8 @@ or modifying field handling.
   with `(raw - 32) * 5 / 9` before displaying Celsius or applying thresholds.
   Example: raw `140` = `60 C`.
 - Throttle/brake/clutch/handbrake/gear are `U8` @ 315-319; steering is `S8`
-  @ 320 (-127..127). `Gear` 0 = neutral, 1-6+ = gears, 20 = reverse, 21 = drive (D),
-  22 = park (P) as in earlier titles — verify against observed data.
+  @ 320 (-127..127). Observed FH6 gear values are 0 = reverse, 1-10 = forward
+  gears, and 11 = neutral. Treat values outside 1-10 as non-forward state.
 - Lap fields: `LapNumber` U16 @ 312, `RacePosition` U8 @ 314, `CurrentRaceTime`
   F32 @ 308 (seconds since driving started).
 
