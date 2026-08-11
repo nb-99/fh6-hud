@@ -11,6 +11,12 @@ namespace Fh6Hud.Panels;
 /// </summary>
 public partial class ShiftCuePanel : PanelWindow
 {
+    private enum CueDirection
+    {
+        Upshift,
+        Downshift,
+    }
+
     /// <summary>Throttle input (0-255) above which the upshift light is shown.</summary>
     private const byte UpshiftThrottleThreshold = 200;
 
@@ -23,8 +29,10 @@ public partial class ShiftCuePanel : PanelWindow
     private readonly SolidColorBrush _cardBrush;
     private readonly SolidColorBrush _shiftUpFillBrush;
     private readonly SolidColorBrush _shiftDownFillBrush;
+    private readonly Func<long> _clock;
+    private CueDirection? _activeCue;
 
-    public ShiftCuePanel(HudState state)
+    public ShiftCuePanel(HudState state, Func<long>? clock = null)
         : base(state, PanelKeys.ShiftCue)
     {
         InitializeComponent();
@@ -35,6 +43,7 @@ public partial class ShiftCuePanel : PanelWindow
         _cardBrush = (SolidColorBrush)FindResource("CardBrush");
         _shiftUpFillBrush = (SolidColorBrush)FindResource("ShiftUpFillBrush");
         _shiftDownFillBrush = (SolidColorBrush)FindResource("ShiftDownFillBrush");
+        _clock = clock ?? (() => Environment.TickCount64);
     }
 
     protected override bool HideWhenNoData => false;
@@ -48,13 +57,23 @@ public partial class ShiftCuePanel : PanelWindow
 
         if (!up && !down)
         {
+            _activeCue = null;
             ShowPlaceholderOrHide();
             return;
         }
 
+        CueDirection direction = up ? CueDirection.Upshift : CueDirection.Downshift;
+        long now = _clock();
+        bool newlyActivated = _activeCue != direction;
+        _activeCue = direction;
+
         Visibility = Visibility.Visible;
         ShiftPlaceholder.Visibility = Visibility.Collapsed;
-        ShiftLight.Visibility = (Environment.TickCount64 / 200) % 2 == 0
+        // Always expose the first frame of a new recommendation. Real drivers
+        // can shift again within one 200 ms blink phase; using only the global
+        // phase would otherwise make the placeholder disappear while the live
+        // pill remains hidden for the entire recommendation.
+        ShiftLight.Visibility = newlyActivated || (now / 200) % 2 == 0
             ? Visibility.Visible
             : Visibility.Hidden;
 

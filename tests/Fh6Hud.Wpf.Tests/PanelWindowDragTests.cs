@@ -48,13 +48,6 @@ public sealed class PanelWindowDragTests
                 Math.Abs((workArea.Left + placement.X * workArea.Width) - (result.FinalLeft + result.Width / 2)),
                 0,
                 1);
-            Assert.Equal("UPSHIFT", result.UpCueText);
-            Assert.Equal("DOWNSHIFT", result.CueText);
-            Assert.True(result.UpUsesDedicatedPill);
-            Assert.True(result.DownUsesDedicatedPill);
-            Assert.Equal(Visibility.Visible, result.ClickThroughCueVisibility);
-            Assert.True(result.PlaceholderUsesSeparatePill);
-            Assert.Equal(Visibility.Visible, result.PlaceholderArrowVisibility);
         }
         finally
         {
@@ -96,53 +89,127 @@ public sealed class PanelWindowDragTests
 
         double finalLeft = panel.Left;
         panel.Close();
+        state.Dispose();
+        app.Shutdown();
+        return new DragResult(initialLeft, finalLeft, initialX, width);
+    }
+
+    [Fact]
+    public void ShiftCue_ShowsLivePillBeforeBlinking()
+    {
+        ShiftCueResult result = RunOnSta(RenderShiftCue);
+
+        Assert.Equal("UPSHIFT", result.UpCueText);
+        Assert.Equal(Visibility.Visible, result.UpVisibility);
+        Assert.Equal(Visibility.Collapsed, result.UpPlaceholderVisibility);
+        Assert.True(result.UpUsesDedicatedPill);
+        Assert.Equal("DOWNSHIFT", result.DownCueText);
+        Assert.Equal(Visibility.Visible, result.DownVisibility);
+        Assert.Equal(Visibility.Collapsed, result.DownPlaceholderVisibility);
+        Assert.True(result.DownUsesDedicatedPill);
+        Assert.Equal(Visibility.Hidden, result.BlinkVisibility);
+    }
+
+    [Fact]
+    public void ShiftCue_ShowsPlaceholderWhenEditingAndHidesInClickThrough()
+    {
+        ShiftCueModeResult result = RunOnSta(RenderShiftCueModes);
+
+        Assert.Equal(Visibility.Visible, result.PlaceholderWindowVisibility);
+        Assert.Equal(Visibility.Visible, result.PlaceholderVisibility);
+        Assert.Equal(Visibility.Collapsed, result.PlaceholderLightVisibility);
+        Assert.Equal(Visibility.Collapsed, result.ClickThroughWindowVisibility);
+    }
+
+    private static ShiftCueResult RenderShiftCue()
+    {
+        var app = new App();
+        app.InitializeComponent();
+        var state = new HudState();
+        state.Initialize(portOverride: 0);
         SeedShiftAdvisor(state);
-        var shiftCue = new ShiftCuePanel(state);
+        EnsureClickThroughOff();
+
+        long clock = 10_000;
+        var shiftCue = new ShiftCuePanel(state, () => clock);
         shiftCue.Show();
         shiftCue.UpdateLayout();
-        var render = typeof(ShiftCuePanel).GetMethod(
-            "Render",
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null,
-            types: new[] { typeof(Fh6Packet) },
-            modifiers: null)!;
-        render.Invoke(shiftCue, new object[] { CreatePacket(gear: 1, rpm: 6500f, accel: 255) });
+
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 6500f, accel: 255));
+        shiftCue.RenderTick();
         string upCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        Visibility upVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        Visibility upPlaceholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
         bool upUsesDedicatedPill = ReferenceEquals(
             shiftCue.FindResource("ShiftUpFillBrush"),
             ((Border)shiftCue.FindName("ShiftLight")!).Background);
-        var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
-        SetLiveState(state, downshiftPacket);
+
+        clock += 200;
         shiftCue.RenderTick();
-        string cueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        Visibility blinkVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+
+        clock += 200;
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 3800f, accel: 255));
+        shiftCue.RenderTick();
+        string downCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        Visibility downVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        Visibility downPlaceholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
         bool downUsesDedicatedPill = ReferenceEquals(
             shiftCue.FindResource("ShiftDownFillBrush"),
             ((Border)shiftCue.FindName("ShiftLight")!).Background);
-        PanelWindow.ToggleClickThroughAll();
-        shiftCue.RenderTick();
-        Visibility clickThroughCueVisibility = shiftCue.Visibility;
-        PanelWindow.ToggleClickThroughAll();
-        SetLiveState(state, downshiftPacket, live: false);
-        shiftCue.RenderTick();
-        Visibility placeholderArrowVisibility = ((TextBlock)shiftCue.FindName("PlaceholderArrow")!).Visibility;
-        bool placeholderUsesSeparatePill =
-            ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility == Visibility.Visible
-            && ((Border)shiftCue.FindName("ShiftLight")!).Visibility == Visibility.Collapsed;
+
         shiftCue.Close();
         state.Dispose();
         app.Shutdown();
-        return new DragResult(
-            initialLeft,
-            finalLeft,
-            initialX,
-            width,
+        return new ShiftCueResult(
             upCueText,
-            cueText,
+            upVisibility,
+            upPlaceholderVisibility,
             upUsesDedicatedPill,
+            downCueText,
+            downVisibility,
+            downPlaceholderVisibility,
             downUsesDedicatedPill,
-            clickThroughCueVisibility,
-            placeholderUsesSeparatePill,
-            placeholderArrowVisibility);
+            blinkVisibility);
+    }
+
+    private static ShiftCueModeResult RenderShiftCueModes()
+    {
+        var app = new App();
+        app.InitializeComponent();
+        var state = new HudState();
+        state.Initialize(portOverride: 0);
+        EnsureClickThroughOff();
+
+        var shiftCue = new ShiftCuePanel(state, () => 10_000);
+        shiftCue.Show();
+        shiftCue.UpdateLayout();
+        shiftCue.RenderTick();
+        Visibility placeholderWindowVisibility = shiftCue.Visibility;
+        Visibility placeholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
+        Visibility placeholderLightVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+
+        PanelWindow.ToggleClickThroughAll();
+        shiftCue.RenderTick();
+        Visibility clickThroughWindowVisibility = shiftCue.Visibility;
+        PanelWindow.ToggleClickThroughAll();
+
+        shiftCue.Close();
+        state.Dispose();
+        app.Shutdown();
+        return new ShiftCueModeResult(
+            placeholderWindowVisibility,
+            placeholderVisibility,
+            placeholderLightVisibility,
+            clickThroughWindowVisibility);
+    }
+
+    private static void EnsureClickThroughOff()
+    {
+        if (PanelWindow.ClickThrough)
+        {
+            PanelWindow.ToggleClickThroughAll();
+        }
     }
 
     private static T RunOnSta<T>(Func<T> action)
@@ -258,12 +325,22 @@ public sealed class PanelWindowDragTests
         double InitialLeft,
         double FinalLeft,
         double InitialX,
-        double Width,
+        double Width);
+
+    private readonly record struct ShiftCueResult(
         string UpCueText,
-        string CueText,
+        Visibility UpVisibility,
+        Visibility UpPlaceholderVisibility,
         bool UpUsesDedicatedPill,
+        string DownCueText,
+        Visibility DownVisibility,
+        Visibility DownPlaceholderVisibility,
         bool DownUsesDedicatedPill,
-        Visibility ClickThroughCueVisibility,
-        bool PlaceholderUsesSeparatePill,
-        Visibility PlaceholderArrowVisibility);
+        Visibility BlinkVisibility);
+
+    private readonly record struct ShiftCueModeResult(
+        Visibility PlaceholderWindowVisibility,
+        Visibility PlaceholderVisibility,
+        Visibility PlaceholderLightVisibility,
+        Visibility ClickThroughWindowVisibility);
 }
