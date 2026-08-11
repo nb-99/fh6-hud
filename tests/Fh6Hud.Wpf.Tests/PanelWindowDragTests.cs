@@ -15,7 +15,7 @@ public sealed class PanelWindowDragTests
     private static readonly Lock WpfTestLock = new();
 
     [Fact]
-    public void MouseDrag_SavesUpdatedPlacement()
+    public void WpfPanels_PersistAndRenderShiftCue()
     {
         string directory = Path.Combine(Path.GetTempPath(), "fh6-hud-wpf-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -32,22 +32,36 @@ public sealed class PanelWindowDragTests
             };
             config.Save(configPath);
 
-            DragResult result = RunOnSta(() => RaiseMouseDrag(configPath));
+            WpfResult result = RunOnSta(() => RunAll(configPath));
             var placement = HudConfig.Load(configPath).Panels[PanelKeys.Status];
             var workArea = SystemParameters.WorkArea;
 
             Assert.InRange(
-                Math.Abs((result.InitialLeft + result.Width / 2) - (workArea.Left + workArea.Width * 0.25)),
+                Math.Abs((result.Drag.InitialLeft + result.Drag.Width / 2) - (workArea.Left + workArea.Width * 0.25)),
                 0,
                 1);
-            Assert.True(result.FinalLeft > result.InitialLeft + 20,
-                $"Expected the panel to move right, but it moved from {result.InitialLeft:F1} to {result.FinalLeft:F1}.");
-            Assert.True(placement.X > result.InitialX,
-                $"Expected saved X to increase, but it moved from {result.InitialX:F4} to {placement.X:F4}.");
+            Assert.True(result.Drag.FinalLeft > result.Drag.InitialLeft + 20,
+                $"Expected the panel to move right, but it moved from {result.Drag.InitialLeft:F1} to {result.Drag.FinalLeft:F1}.");
+            Assert.True(placement.X > result.Drag.InitialX,
+                $"Expected saved X to increase, but it moved from {result.Drag.InitialX:F4} to {placement.X:F4}.");
             Assert.InRange(
-                Math.Abs((workArea.Left + placement.X * workArea.Width) - (result.FinalLeft + result.Width / 2)),
+                Math.Abs((workArea.Left + placement.X * workArea.Width) - (result.Drag.FinalLeft + result.Drag.Width / 2)),
                 0,
                 1);
+            Assert.Equal("UPSHIFT", result.LiveCue.UpCueText);
+            Assert.Equal(Visibility.Visible, result.LiveCue.UpVisibility);
+            Assert.Equal(Visibility.Collapsed, result.LiveCue.UpPlaceholderVisibility);
+            Assert.True(result.LiveCue.UpUsesDedicatedPill);
+            Assert.Equal("DOWNSHIFT", result.LiveCue.DownCueText);
+            Assert.Equal(Visibility.Visible, result.LiveCue.DownVisibility);
+            Assert.Equal(Visibility.Collapsed, result.LiveCue.DownPlaceholderVisibility);
+            Assert.True(result.LiveCue.DownUsesDedicatedPill);
+            Assert.Equal(Visibility.Hidden, result.LiveCue.BlinkVisibility);
+
+            Assert.Equal(Visibility.Visible, result.Modes.PlaceholderWindowVisibility);
+            Assert.Equal(Visibility.Visible, result.Modes.PlaceholderVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Modes.PlaceholderLightVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Modes.ClickThroughWindowVisibility);
         }
         finally
         {
@@ -62,11 +76,25 @@ public sealed class PanelWindowDragTests
         }
     }
 
-    private static DragResult RaiseMouseDrag(string configPath)
+    private static WpfResult RunAll(string configPath)
     {
         var app = new App();
         app.InitializeComponent();
+        try
+        {
+            return new WpfResult(
+                RaiseMouseDrag(configPath),
+                RenderShiftCue(),
+                RenderShiftCueModes());
+        }
+        finally
+        {
+            app.Shutdown();
+        }
+    }
 
+    private static DragResult RaiseMouseDrag(string configPath)
+    {
         var state = new HudState();
         state.Initialize(portOverride: 0, configPath: configPath);
 
@@ -90,41 +118,11 @@ public sealed class PanelWindowDragTests
         double finalLeft = panel.Left;
         panel.Close();
         state.Dispose();
-        app.Shutdown();
         return new DragResult(initialLeft, finalLeft, initialX, width);
-    }
-
-    [Fact]
-    public void ShiftCue_ShowsLivePillBeforeBlinking()
-    {
-        ShiftCueResult result = RunOnSta(RenderShiftCue);
-
-        Assert.Equal("UPSHIFT", result.UpCueText);
-        Assert.Equal(Visibility.Visible, result.UpVisibility);
-        Assert.Equal(Visibility.Collapsed, result.UpPlaceholderVisibility);
-        Assert.True(result.UpUsesDedicatedPill);
-        Assert.Equal("DOWNSHIFT", result.DownCueText);
-        Assert.Equal(Visibility.Visible, result.DownVisibility);
-        Assert.Equal(Visibility.Collapsed, result.DownPlaceholderVisibility);
-        Assert.True(result.DownUsesDedicatedPill);
-        Assert.Equal(Visibility.Hidden, result.BlinkVisibility);
-    }
-
-    [Fact]
-    public void ShiftCue_ShowsPlaceholderWhenEditingAndHidesInClickThrough()
-    {
-        ShiftCueModeResult result = RunOnSta(RenderShiftCueModes);
-
-        Assert.Equal(Visibility.Visible, result.PlaceholderWindowVisibility);
-        Assert.Equal(Visibility.Visible, result.PlaceholderVisibility);
-        Assert.Equal(Visibility.Collapsed, result.PlaceholderLightVisibility);
-        Assert.Equal(Visibility.Collapsed, result.ClickThroughWindowVisibility);
     }
 
     private static ShiftCueResult RenderShiftCue()
     {
-        var app = new App();
-        app.InitializeComponent();
         var state = new HudState();
         state.Initialize(portOverride: 0);
         SeedShiftAdvisor(state);
@@ -160,7 +158,6 @@ public sealed class PanelWindowDragTests
 
         shiftCue.Close();
         state.Dispose();
-        app.Shutdown();
         return new ShiftCueResult(
             upCueText,
             upVisibility,
@@ -175,8 +172,6 @@ public sealed class PanelWindowDragTests
 
     private static ShiftCueModeResult RenderShiftCueModes()
     {
-        var app = new App();
-        app.InitializeComponent();
         var state = new HudState();
         state.Initialize(portOverride: 0);
         EnsureClickThroughOff();
@@ -196,7 +191,6 @@ public sealed class PanelWindowDragTests
 
         shiftCue.Close();
         state.Dispose();
-        app.Shutdown();
         return new ShiftCueModeResult(
             placeholderWindowVisibility,
             placeholderVisibility,
@@ -326,6 +320,11 @@ public sealed class PanelWindowDragTests
         double FinalLeft,
         double InitialX,
         double Width);
+
+    private readonly record struct WpfResult(
+        DragResult Drag,
+        ShiftCueResult LiveCue,
+        ShiftCueModeResult Modes);
 
     private readonly record struct ShiftCueResult(
         string UpCueText,
