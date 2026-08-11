@@ -87,6 +87,11 @@ diagnostics to `hud.log` next to the executable. Run a test instance beside the
 production app — e.g. fed by the simulator while the game keeps streaming to
 the prod port — with:
 
+The HUD also writes low-volume SHIFT-HEALTH records to hud.log without debug
+logging. These record the advisor decision and the WPF/native window presentation
+state, so a cue that is logically rendered can be distinguished from a cue that
+never reached a visible native window.
+
 ```sh
 dotnet run --project src/Fh6Hud -- --port 45001
 dotnet run --project tools/Fh6Hud.Simulator --port 45001 --scenario launch
@@ -225,3 +230,14 @@ docs/fh6-data-out.md        official FH6 Data Out spec snapshot
   (≥1.5%) and keeps 400 RPM of headroom below the lower gear's shift point,
   so it stays quiet near the boundary, on flat power curves, and right after
   an upshift at the limiter (no shift-down-into-limiter bounce).
+- **Shift indicators work in the simulator/edit mode but not in game** — the
+  game uses click-through mode, which makes the HUD windows layered and
+  transparent. The shift-cue window must remain mounted in that mode; collapsing
+  the whole WPF window caused its native HWND to become hidden or 2×2, leaving a
+  blank compositor surface when the next cue appeared. The fix keeps the HWND
+  mounted, collapses only the idle child content, and restores its measured
+  native size without activating it. With debug logging disabled, inspect
+  hud.log beside the executable for [SHIFT-HEALTH] lines: a working cue reports
+  mode=UP or mode=DOWN, light=Visible, nativeVisible=True, and a non-trivial
+  nativeBounds value. [PRESENTATION-REPAIR] records a native size/visibility
+  repair when one is needed.

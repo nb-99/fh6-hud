@@ -70,6 +70,8 @@ public partial class App : Application
         _watchdog.Start();
 
         HudLog.Info($"started port={(int?)_state.Listener?.Port ?? _state.Config.Port} debug={HudLog.Enabled}");
+        HudLog.Health($"[HUD-HEALTH] started port={(int?)_state.Listener?.Port ?? _state.Config.Port} " +
+                     $"debug={HudLog.Enabled} hotkeyAvailable={PanelWindow.HotkeyAvailable}");
     }
 
     private void OnRendering(object? sender, EventArgs e)

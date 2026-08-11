@@ -69,11 +69,17 @@ public sealed class PanelWindowDragTests
             Assert.Equal(Visibility.Visible, result.LiveCue.ClickThroughCueVisibility);
             Assert.True(result.LiveCue.PlaceholderUsesSeparatePill);
             Assert.Equal(Visibility.Visible, result.LiveCue.PlaceholderArrowVisibility);
+            Assert.Equal("UPSHIFT", result.LiveCue.ForcedUpCueText);
+            Assert.Equal("\u25B2", result.LiveCue.ForcedUpCueArrow);
+            Assert.Equal(Visibility.Visible, result.LiveCue.ForcedUpVisibility);
+            Assert.Equal("DOWNSHIFT", result.LiveCue.ForcedDownCueText);
+            Assert.Equal("\u25BC", result.LiveCue.ForcedDownCueArrow);
+            Assert.Equal(Visibility.Visible, result.LiveCue.ForcedDownVisibility);
 
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderWindowVisibility);
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderVisibility);
             Assert.Equal(Visibility.Collapsed, result.Modes.PlaceholderLightVisibility);
-            Assert.Equal(Visibility.Collapsed, result.Modes.ClickThroughWindowVisibility);
+            Assert.Equal(Visibility.Visible, result.Modes.ClickThroughWindowVisibility);
         }
         finally
         {
@@ -171,6 +177,21 @@ public sealed class PanelWindowDragTests
             shiftCue.FindResource("ShiftDownFillBrush"),
             ((Border)shiftCue.FindName("ShiftLight")!).Background);
 
+        ClickMenuItem(shiftCue, "Force UPSHIFT cue");
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 3500f, accel: 0));
+        shiftCue.RenderTick();
+        string forcedUpCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string forcedUpCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
+        Visibility forcedUpVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        ClickMenuItem(shiftCue, "Force UPSHIFT cue");
+
+        ClickMenuItem(shiftCue, "Force DOWNSHIFT cue");
+        shiftCue.RenderTick();
+        string forcedDownCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string forcedDownCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
+        Visibility forcedDownVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        ClickMenuItem(shiftCue, "Force DOWNSHIFT cue");
+
         ForceOverlappingAdvisorState(state.ShiftAdvisor);
         SetLiveState(state, CreatePacket(gear: 2, rpm: 3500f, accel: 255));
         shiftCue.RenderTick();
@@ -212,7 +233,13 @@ public sealed class PanelWindowDragTests
             clickThroughLightVisibility,
             clickThroughLightOpacity,
             placeholderUsesSeparatePill,
-            placeholderArrowVisibility);
+            placeholderArrowVisibility,
+            forcedUpCueText,
+            forcedUpCueArrow,
+            forcedUpVisibility,
+            forcedDownCueText,
+            forcedDownCueArrow,
+            forcedDownVisibility);
     }
 
     private static ShiftCueModeResult RenderShiftCueModes()
@@ -249,6 +276,14 @@ public sealed class PanelWindowDragTests
         {
             PanelWindow.ToggleClickThroughAll();
         }
+    }
+
+    private static void ClickMenuItem(ShiftCuePanel shiftCue, string header)
+    {
+        var item = shiftCue.ContextMenu!.Items
+            .OfType<MenuItem>()
+            .Single(item => string.Equals(item.Header?.ToString(), header, StringComparison.Ordinal));
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     }
 
     private static void ForceOverlappingAdvisorState(ShiftPointAdvisor advisor)
@@ -467,7 +502,13 @@ public sealed class PanelWindowDragTests
         Visibility ClickThroughLightVisibility,
         double ClickThroughLightOpacity,
         bool PlaceholderUsesSeparatePill,
-        Visibility PlaceholderArrowVisibility);
+        Visibility PlaceholderArrowVisibility,
+        string ForcedUpCueText,
+        string ForcedUpCueArrow,
+        Visibility ForcedUpVisibility,
+        string ForcedDownCueText,
+        string ForcedDownCueArrow,
+        Visibility ForcedDownVisibility);
 
     private readonly record struct ShiftCueModeResult(
         Visibility PlaceholderWindowVisibility,

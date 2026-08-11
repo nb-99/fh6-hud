@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using Fh6Hud.Telemetry;
 
@@ -30,9 +31,14 @@ public partial class ShiftCuePanel : PanelWindow
     private readonly SolidColorBrush _shiftUpFillBrush;
     private readonly SolidColorBrush _shiftDownFillBrush;
     private readonly Func<long> _clock;
+    private MenuItem? _forceUpshiftMenuItem;
+    private MenuItem? _forceDownshiftMenuItem;
+    private CueDirection? _forcedCue;
     private CueDirection? _activeCue;
     private string _lastDiagnosticKey = "";
     private long _lastDiagnosticAt;
+    private string _lastHealthKey = "";
+    private long _lastHealthAt;
 
     public ShiftCuePanel(HudState state, Func<long>? clock = null)
         : base(state, PanelKeys.ShiftCue)
@@ -46,20 +52,24 @@ public partial class ShiftCuePanel : PanelWindow
         _shiftUpFillBrush = (SolidColorBrush)FindResource("ShiftUpFillBrush");
         _shiftDownFillBrush = (SolidColorBrush)FindResource("ShiftDownFillBrush");
         _clock = clock ?? (() => Environment.TickCount64);
+        AddForceCueMenuItems();
     }
 
     protected override bool HideWhenNoData => false;
 
     protected override void Render(Fh6Packet packet)
     {
-        bool upAdvice = State.ShiftAdvisor.ShouldUpshift(packet.Gear, packet.CurrentEngineRpm);
-        bool upGate = packet.Accel >= UpshiftThrottleThreshold;
-        bool up = upAdvice && upGate;
+        bool forceUp = _forcedCue == CueDirection.Upshift;
+        bool forceDown = _forcedCue == CueDirection.Downshift;
+        bool upAdvice = !forceUp && !forceDown
+                         && State.ShiftAdvisor.ShouldUpshift(packet.Gear, packet.CurrentEngineRpm);
+        bool upGate = forceUp || packet.Accel >= UpshiftThrottleThreshold;
+        bool up = forceUp || (!forceDown && upAdvice && upGate);
         bool downEvaluated = !up;
         bool downAdvice = downEvaluated
-                           && State.ShiftAdvisor.ShouldDownshift(packet.Gear, packet.CurrentEngineRpm);
-        bool downGate = packet.Accel >= DownshiftThrottleThreshold;
-        bool down = downAdvice && downGate;
+                           && (forceDown || State.ShiftAdvisor.ShouldDownshift(packet.Gear, packet.CurrentEngineRpm));
+        bool downGate = forceDown || packet.Accel >= DownshiftThrottleThreshold;
+        bool down = downEvaluated && (forceDown || downAdvice && downGate);
         float? upRpm = State.ShiftAdvisor.GetShiftRpm(packet.Gear);
         float? downRpm = State.ShiftAdvisor.GetDownshiftRpm(packet.Gear);
 
@@ -130,7 +140,17 @@ public partial class ShiftCuePanel : PanelWindow
 
     protected override void RenderNoData()
     {
+        // A forced cue is an explicit visual probe. Keep it visible over the
+        // last packet while telemetry briefly goes stale so the probe does not
+        // disappear during the exact transition being investigated.
+        if (_forcedCue is not null && State.Latest is { } packet)
+        {
+            Render(packet);
+            return;
+        }
+
         ShowPlaceholderOrHide();
+        LogNoDataHealth();
         string key = $"NODATA|{State.Live}|{ClickThrough}|{Visibility}|{ShiftPlaceholder.Visibility}|{ShiftLight.Visibility}";
         if (string.Equals(key, _lastDiagnosticKey, StringComparison.Ordinal))
         {
@@ -159,6 +179,15 @@ public partial class ShiftCuePanel : PanelWindow
             $"{mode}|{packet.Gear}|{upRpm.HasValue}|{downRpm.HasValue}|{upAdvice}|{upGate}|" +
             $"{downEvaluated}|{downAdvice}|{downGate}|{ClickThrough}|{Visibility}";
         long now = Environment.TickCount64;
+        LogHealth(
+            packet,
+            mode,
+            upAdvice,
+            upGate,
+            downEvaluated,
+            downAdvice,
+            downGate,
+            now);
         if (string.Equals(key, _lastDiagnosticKey, StringComparison.Ordinal)
             && (string.Equals(mode, "NONE", StringComparison.Ordinal)
                 || now - _lastDiagnosticAt < 1000))
@@ -178,9 +207,66 @@ public partial class ShiftCuePanel : PanelWindow
             $"upAdvice={upAdvice} upGate={upGate} " +
             $"upRpm={FormatRpm(upRpm)} downEvaluated={downEvaluated} " +
             $"downAdvice={downAdvice} downGate={downGate} downRpm={FormatRpm(downRpm)} " +
+            $"forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
             $"ratioSamples={State.GearRatios.GetSampleCount(packet.Gear)} " +
             $"powerBuckets={State.PowerCurve.BucketCount} " +
             $"maxPower={State.PowerCurve.MaxPowerW.ToString("F0", CultureInfo.InvariantCulture)}");
+    }
+
+    private void LogHealth(
+        Fh6Packet packet,
+        string mode,
+        bool upAdvice,
+        bool upGate,
+        bool downEvaluated,
+        bool downAdvice,
+        bool downGate,
+        long now)
+    {
+        string key =
+            $"{mode}|{State.Live}|{ClickThrough}|{Visibility}|{IsVisible}|" +
+            $"{ShiftLight.Visibility}|{ShiftPlaceholder.Visibility}|{_forcedCue}|" +
+            GetNativePresentationDiagnostics();
+        if (string.Equals(key, _lastHealthKey, StringComparison.Ordinal)
+            && now - _lastHealthAt < 5000)
+        {
+            return;
+        }
+
+        _lastHealthKey = key;
+        _lastHealthAt = now;
+        HudLog.Health(
+            $"[SHIFT-HEALTH] mode={mode} live={State.Live} clickThrough={ClickThrough} " +
+            $"wpfVisibility={Visibility} isVisible={IsVisible} " +
+            $"light={ShiftLight.Visibility} opacity={ShiftLight.Opacity.ToString("F2", CultureInfo.InvariantCulture)} " +
+            $"placeholder={ShiftPlaceholder.Visibility} forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
+            $"gear={packet.Gear} rpm={packet.CurrentEngineRpm.ToString("F0", CultureInfo.InvariantCulture)} " +
+            $"accel={packet.Accel} upAdvice={upAdvice} upGate={upGate} " +
+            $"downEvaluated={downEvaluated} downAdvice={downAdvice} downGate={downGate} " +
+            GetNativePresentationDiagnostics());
+    }
+
+    private void LogNoDataHealth()
+    {
+        string key =
+            $"NODATA|{State.Live}|{ClickThrough}|{Visibility}|{IsVisible}|" +
+            $"{ShiftLight.Visibility}|{ShiftPlaceholder.Visibility}|{_forcedCue}|" +
+            GetNativePresentationDiagnostics();
+        long now = Environment.TickCount64;
+        if (string.Equals(key, _lastHealthKey, StringComparison.Ordinal)
+            && now - _lastHealthAt < 5000)
+        {
+            return;
+        }
+
+        _lastHealthKey = key;
+        _lastHealthAt = now;
+        HudLog.Health(
+            $"[SHIFT-HEALTH] mode=NODATA live={State.Live} clickThrough={ClickThrough} " +
+            $"wpfVisibility={Visibility} isVisible={IsVisible} " +
+            $"light={ShiftLight.Visibility} opacity={ShiftLight.Opacity.ToString("F2", CultureInfo.InvariantCulture)} " +
+            $"placeholder={ShiftPlaceholder.Visibility} forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
+            GetNativePresentationDiagnostics());
     }
 
     private static string FormatRpm(float? rpm) =>
@@ -188,11 +274,62 @@ public partial class ShiftCuePanel : PanelWindow
             ? value.ToString("F0", CultureInfo.InvariantCulture)
             : "-";
 
+    private void AddForceCueMenuItems()
+    {
+        _forceUpshiftMenuItem = new MenuItem
+        {
+            Header = "Force UPSHIFT cue",
+            IsCheckable = true,
+        };
+        _forceUpshiftMenuItem.Click += (_, _) => SetForcedCue(CueDirection.Upshift);
+
+        _forceDownshiftMenuItem = new MenuItem
+        {
+            Header = "Force DOWNSHIFT cue",
+            IsCheckable = true,
+        };
+        _forceDownshiftMenuItem.Click += (_, _) => SetForcedCue(CueDirection.Downshift);
+
+        // BuildMenu places the separator and Quit entries last. Insert these
+        // immediately before them so the probe stays with the panel controls.
+        int insertIndex = Math.Max(0, ContextMenu!.Items.Count - 2);
+        ContextMenu.Items.Insert(insertIndex, _forceUpshiftMenuItem);
+        ContextMenu.Items.Insert(insertIndex + 1, _forceDownshiftMenuItem);
+        ContextMenu.Opened += (_, _) => SyncForcedCueChecks();
+    }
+
+    private void SetForcedCue(CueDirection direction)
+    {
+        _forcedCue = _forcedCue == direction ? null : direction;
+        _activeCue = null;
+        SyncForcedCueChecks();
+        RenderTick();
+    }
+
+    private void SyncForcedCueChecks()
+    {
+        if (_forceUpshiftMenuItem is not null)
+        {
+            _forceUpshiftMenuItem.IsChecked = _forcedCue == CueDirection.Upshift;
+        }
+
+        if (_forceDownshiftMenuItem is not null)
+        {
+            _forceDownshiftMenuItem.IsChecked = _forcedCue == CueDirection.Downshift;
+        }
+    }
+
     private void ShowPlaceholderOrHide()
     {
         if (ClickThrough)
         {
-            Visibility = Visibility.Collapsed;
+            // Keep the layered HWND mounted while passing input through to the
+            // game. Collapsing the Window itself leaves a blank compositor
+            // surface when the next cue tries to bring it back.
+            Visibility = Visibility.Visible;
+            ShiftLight.Visibility = Visibility.Collapsed;
+            ShiftLight.Opacity = 1;
+            ShiftPlaceholder.Visibility = Visibility.Collapsed;
             return;
         }
 

@@ -5,7 +5,8 @@ namespace Fh6Hud.Telemetry;
 /// <summary>
 /// Minimal file logger for diagnosing issues on machines that cannot be
 /// inspected directly. Writes timestamped lines to a single log file; enabled
-/// via the <c>DebugLog</c> config option or the <c>--debug</c> CLI flag.
+/// via the <c>DebugLog</c> config option or the <c>--debug</c> CLI flag. Health
+/// records are intentionally available even when verbose debug logging is off.
 /// Logging must never take the HUD down, so write failures are swallowed.
 /// </summary>
 public static class HudLog
@@ -14,6 +15,7 @@ public static class HudLog
     {
         Debug,
         Info,
+        Health,
         Error,
     }
 
@@ -47,17 +49,20 @@ public static class HudLog
 
     public static void Info(string message) => Write(LogLevel.Info, message);
 
+    /// <summary>Writes a throttled runtime health record even when debug is off.</summary>
+    public static void Health(string message) => Write(LogLevel.Health, message, always: true);
+
     public static void Error(string message) => Write(LogLevel.Error, message);
 
     public static void Error(string message, Exception exception) =>
         Write(LogLevel.Error, $"{message}: {exception}");
 
-    private static void Write(LogLevel level, string message)
+    private static void Write(LogLevel level, string message, bool always = false)
     {
         lock (Sync)
         {
             string? path = FilePath;
-            if (!Enabled || string.IsNullOrEmpty(path))
+            if ((!always && !Enabled) || string.IsNullOrEmpty(path))
             {
                 return;
             }
