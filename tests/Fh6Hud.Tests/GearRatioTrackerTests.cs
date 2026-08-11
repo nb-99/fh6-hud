@@ -28,7 +28,8 @@ public class GearRatioTrackerTests
         return Fh6Packet.Parse(bytes)!;
     }
 
-    private static void Feed(GearRatioTracker tracker, byte gear, float rpm, float speedMs, int count) {
+    private static void Feed(GearRatioTracker tracker, byte gear, float rpm, float speedMs, int count)
+    {
         for (int i = 0; i < count; i++)
         {
             tracker.AddSample(Packet(gear, rpm, speedMs));
@@ -55,10 +56,9 @@ public class GearRatioTrackerTests
     }
 
     [Theory]
-    [InlineData((byte)0)]  // neutral
-    [InlineData((byte)20)] // reverse
-    [InlineData((byte)21)] // drive (actual gear unknown)
-    [InlineData((byte)22)] // park
+    [InlineData((byte)0)]  // reverse
+    [InlineData((byte)11)] // neutral
+    [InlineData((byte)20)] // invalid/non-forward
     public void IgnoresNonForwardGears(byte gear)
     {
         var tracker = new GearRatioTracker();

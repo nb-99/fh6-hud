@@ -51,6 +51,8 @@ public sealed class HudConfig
         [PanelKeys.Speedo] = new() { X = 1.00, Y = 0.42, Anchor = PanelAnchor.TopRight },
         // Status line and hints bottom-middle.
         [PanelKeys.Status] = new() { X = 0.50, Y = 0.92, Anchor = PanelAnchor.BottomCenter },
+        // Live shift cue centered in the driver's field of view.
+        [PanelKeys.ShiftCue] = new() { X = 0.50, Y = 0.50, Anchor = PanelAnchor.Center },
     };
 
     [JsonIgnore]

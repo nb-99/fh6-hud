@@ -25,6 +25,7 @@ public abstract class PanelWindow : Window
     private const int SwpNoSize = 0x1;
     private const int SwpNoActivate = 0x10;
     private const int SwpFrameChanged = 0x20;
+    private const int SwShownNoActivate = 4;
     private const int WmHotkey = 0x0312;
     private const int HotkeyId = 1;
     private const int ModControlAlt = 0x2 | 0x1;
@@ -67,6 +68,78 @@ public abstract class PanelWindow : Window
 
     protected string PanelKey { get; }
 
+    /// <summary>
+    /// Returns the native window state needed to distinguish a WPF visibility
+    /// decision from a window that Windows can actually present.
+    /// </summary>
+    protected string GetNativePresentationDiagnostics()
+    {
+        IntPtr handle = _source?.Handle ?? IntPtr.Zero;
+        if (handle == IntPtr.Zero)
+        {
+            return "hwnd=0";
+        }
+
+        long extendedStyle = GetWindowLongPtr(handle, GwlExStyle).ToInt64();
+        string bounds = GetWindowRect(handle, out NativeRect rect)
+            ? $"({rect.Left},{rect.Top},{rect.Right - rect.Left}x{rect.Bottom - rect.Top})"
+            : "?";
+        return $"hwnd=0x{handle.ToInt64():X} nativeVisible={IsWindowVisible(handle)} " +
+               $"exStyle=0x{extendedStyle:X} transparent={(extendedStyle & WsExTransparent) != 0} " +
+               $"layered={(extendedStyle & WsExLayered) != 0} tool={(extendedStyle & WsExToolWindow) != 0} " +
+               $"nativeBounds={bounds}";
+    }
+
+    /// <summary>
+    /// WPF can leave a collapsed, layered window hidden at a 2x2 native size
+    /// when content changes back to visible while click-through is enabled.
+    /// Reconcile the native HWND after rendering without activating it.
+    /// </summary>
+    private void EnsureNativePresentation()
+    {
+        if (Visibility != Visibility.Visible
+            || _source?.Handle is not { } handle
+            || handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (IsWindowVisible(handle)
+            && GetWindowRect(handle, out NativeRect currentRect)
+            && currentRect.Right - currentRect.Left > 2
+            && currentRect.Bottom - currentRect.Top > 2)
+        {
+            return;
+        }
+
+        // A mounted click-through panel intentionally has no visual content
+        // while idle and may therefore be 2x2. Wait for its content to expand
+        // before treating that size as a repair failure.
+        if (Math.Max(ActualWidth, DesiredSize.Width) <= 2
+            || Math.Max(ActualHeight, DesiredSize.Height) <= 2)
+        {
+            return;
+        }
+
+        UpdateLayout();
+        ApplyExtendedStyle();
+
+        int width = Math.Max(1, (int)Math.Ceiling(Math.Max(ActualWidth, DesiredSize.Width)));
+        int height = Math.Max(1, (int)Math.Ceiling(Math.Max(ActualHeight, DesiredSize.Height)));
+        ShowWindow(handle, SwShownNoActivate);
+        SetWindowPos(
+            handle,
+            new IntPtr(-1),
+            0,
+            0,
+            width,
+            height,
+            SwpNoMove | SwpNoActivate | SwpFrameChanged);
+        HudLog.Health(
+            $"[PRESENTATION-REPAIR] panel={GetType().Name} size={width}x{height} " +
+            GetNativePresentationDiagnostics());
+    }
+
     /// <summary>Global toggle: while true, every panel passes input to the game.</summary>
     public static bool ClickThrough => _clickThrough;
 
@@ -87,6 +160,7 @@ public abstract class PanelWindow : Window
             }
 
             RenderNoData();
+            EnsureNativePresentation();
             return;
         }
 
@@ -96,6 +170,7 @@ public abstract class PanelWindow : Window
         }
 
         Render(State.Latest!);
+        EnsureNativePresentation();
     }
 
     protected abstract void Render(Fh6Packet packet);
@@ -146,7 +221,7 @@ public abstract class PanelWindow : Window
             return;
         }
 
-        // ToolWindow always (five panel windows must not flood Alt-Tab);
+        // ToolWindow always (six panel windows must not flood Alt-Tab);
         // Transparent only while click-through is on (Layered stays once set,
         // mirroring the original single-window behavior).
         var style = GetWindowLongPtr(handle, GwlExStyle) | WsExToolWindow;
@@ -184,9 +259,12 @@ public abstract class PanelWindow : Window
             return;
         }
 
-        DragMove();
+        MoveWindowForDrag();
         PersistPlacement();
     }
+
+    /// <summary>Moves the window for a left-button drag.</summary>
+    protected virtual void MoveWindowForDrag() => DragMove();
 
     private void PersistPlacement()
     {
@@ -205,13 +283,14 @@ public abstract class PanelWindow : Window
     private static double AnchorOffsetX(PanelAnchor anchor, double width) => anchor switch
     {
         PanelAnchor.TopRight or PanelAnchor.BottomRight => width,
-        PanelAnchor.TopCenter or PanelAnchor.BottomCenter => width / 2,
+        PanelAnchor.TopCenter or PanelAnchor.BottomCenter or PanelAnchor.Center => width / 2,
         _ => 0,
     };
 
     private static double AnchorOffsetY(PanelAnchor anchor, double height) => anchor switch
     {
         PanelAnchor.BottomLeft or PanelAnchor.BottomRight or PanelAnchor.BottomCenter => height,
+        PanelAnchor.Center => height / 2,
         _ => 0,
     };
 
@@ -294,8 +373,26 @@ public abstract class PanelWindow : Window
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
 
     [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int command);
+
+    [DllImport("user32.dll")]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
     [DllImport("user32.dll")]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 }

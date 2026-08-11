@@ -12,26 +12,20 @@
             <Grid>
                 <TextBlock Text="TIRE TEMPERATURE"
                            Foreground="{StaticResource TextBrush}"
-                           FontSize="11"
+                           FontSize="13"
                            FontWeight="Bold"/>
-                <TextBlock x:Name="TireRangeText"
-                           Text="TARGET 86-104 °C"
-                           HorizontalAlignment="Right"
-                           Foreground="{StaticResource MutedBrush}"
-                           FontSize="9"
-                           VerticalAlignment="Center"/>
             </Grid>
 
             <Grid Margin="0,12,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="112"/>
-                    <ColumnDefinition Width="8"/>
-                    <ColumnDefinition Width="112"/>
+                    <ColumnDefinition Width="128"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="128"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="98"/>
-                    <RowDefinition Height="8"/>
-                    <RowDefinition Height="98"/>
+                    <RowDefinition Height="108"/>
+                    <RowDefinition Height="9"/>
+                    <RowDefinition Height="108"/>
                 </Grid.RowDefinitions>
 
                 <Border x:Name="TireFlCard"
@@ -44,8 +38,8 @@
                         Padding="10">
                     <Grid>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
-                            <TextBlock Text="FL" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold"/>
-                            <TextBlock x:Name="TireFlState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="8,1,0,0"/>
+                            <TextBlock Text="FL" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="TireFlState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="8,1,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="TireFl" Text="--°" FontFamily="{StaticResource DigitFont}" FontSize="27" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Bottom"/>
                     </Grid>
@@ -61,8 +55,8 @@
                         Padding="10">
                     <Grid>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
-                            <TextBlock Text="FR" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold"/>
-                            <TextBlock x:Name="TireFrState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="8,1,0,0"/>
+                            <TextBlock Text="FR" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="TireFrState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="8,1,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="TireFr" Text="--°" FontFamily="{StaticResource DigitFont}" FontSize="27" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Bottom"/>
                     </Grid>
@@ -78,8 +72,8 @@
                         Padding="10">
                     <Grid>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
-                            <TextBlock Text="RL" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold"/>
-                            <TextBlock x:Name="TireRlState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="8,1,0,0"/>
+                            <TextBlock Text="RL" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="TireRlState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="8,1,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="TireRl" Text="--°" FontFamily="{StaticResource DigitFont}" FontSize="27" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Bottom"/>
                     </Grid>
@@ -95,22 +89,22 @@
                         Padding="10">
                     <Grid>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
-                            <TextBlock Text="RR" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold"/>
-                            <TextBlock x:Name="TireRrState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="8,1,0,0"/>
+                            <TextBlock Text="RR" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="TireRrState" Text="--" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="8,1,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="TireRr" Text="--°" FontFamily="{StaticResource DigitFont}" FontSize="27" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Bottom"/>
                     </Grid>
                 </Border>
             </Grid>
 
-            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                <Ellipse Width="7" Height="7" Fill="{StaticResource ColdBrush}" Margin="0,2,5,0"/>
-                <TextBlock Text="COLD" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="0,0,13,0"/>
-                <Ellipse Width="7" Height="7" Fill="{StaticResource OkBrush}" Margin="0,2,5,0"/>
-                <TextBlock Text="IN RANGE" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="0,0,13,0"/>
-                <Ellipse Width="7" Height="7" Fill="{StaticResource HotBrush}" Margin="0,2,5,0"/>
-                <TextBlock Text="HOT" Foreground="{StaticResource MutedBrush}" FontSize="9"/>
-            </StackPanel>
+            <TextBlock x:Name="TireRangeText"
+                       Text="TARGET 72-90 °C"
+                       HorizontalAlignment="Center"
+                       Foreground="{StaticResource SecondaryBrush}"
+                       FontFamily="{StaticResource DigitFont}"
+                       FontSize="13"
+                       FontWeight="Bold"
+                       Margin="0,12,0,0"/>
         </StackPanel>
     </Border>
 </fh6:PanelWindow>

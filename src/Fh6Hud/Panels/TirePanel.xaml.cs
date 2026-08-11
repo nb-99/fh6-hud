@@ -97,7 +97,7 @@ public partial class TirePanel : PanelWindow
         {
             stateBrush = _okBrush;
             fillBrush = _okFillBrush;
-            state = "IN RANGE";
+            state = "✓";
         }
 
         SetText(valueBlock, $"{tempC:F0}°");

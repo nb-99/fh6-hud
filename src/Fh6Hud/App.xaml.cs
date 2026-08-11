@@ -55,6 +55,7 @@ public partial class App : Application
         _panels.Add(new Panels.StatusPanel(_state));
         _panels.Add(new Panels.TirePanel(_state));
         _panels.Add(new Panels.EnginePanel(_state));
+        _panels.Add(new Panels.ShiftCuePanel(_state));
         _panels.Add(new Panels.IntervalPanel(_state));
         _panels.Add(new Panels.SpeedoPanel(_state));
 
@@ -69,6 +70,8 @@ public partial class App : Application
         _watchdog.Start();
 
         HudLog.Info($"started port={(int?)_state.Listener?.Port ?? _state.Config.Port} debug={HudLog.Enabled}");
+        HudLog.Health($"[HUD-HEALTH] started port={(int?)_state.Listener?.Port ?? _state.Config.Port} " +
+                     $"debug={HudLog.Enabled} hotkeyAvailable={PanelWindow.HotkeyAvailable}");
     }
 
     private void OnRendering(object? sender, EventArgs e)

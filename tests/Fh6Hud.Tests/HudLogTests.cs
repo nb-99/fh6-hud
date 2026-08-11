@@ -25,6 +25,18 @@ public class HudLogTests : IDisposable
     }
 
     [Fact]
+    public void Disabled_WritesHealthRecords()
+    {
+        string path = Path.Combine(_dir, "hud.log");
+        Directory.CreateDirectory(_dir);
+        HudLog.Initialize(path, enabled: false);
+        HudLog.Health("[HEALTH] still alive");
+
+        string[] lines = File.ReadAllLines(path);
+        Assert.Contains(lines, l => l.Contains("[HEALTH] [HEALTH] still alive"));
+    }
+
+    [Fact]
     public void Enabled_WritesTimestampedLines()
     {
         string path = Path.Combine(_dir, "hud.log");
