@@ -7,6 +7,7 @@ using System.Windows.Input;
 using Fh6Hud;
 using Fh6Hud.Panels;
 using Fh6Hud.Telemetry;
+using Shapes = System.Windows.Shapes;
 
 namespace Fh6Hud.Wpf.Tests;
 
@@ -80,6 +81,29 @@ public sealed class PanelWindowDragTests
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderVisibility);
             Assert.Equal(Visibility.Collapsed, result.Modes.PlaceholderLightVisibility);
             Assert.Equal(Visibility.Visible, result.Modes.ClickThroughWindowVisibility);
+
+            // Progressive approach cue (issue #12).
+            Assert.Equal(Visibility.Visible, result.Approach.WindowStartApproachVisibility);
+            Assert.Equal(1, result.Approach.WindowStartActiveLights);
+            Assert.True(result.Approach.WindowStartFirstLightYellow);
+            Assert.True(result.Approach.WindowStartSecondLightInactive);
+            Assert.Equal(Visibility.Visible, result.Approach.MidApproachVisibility);
+            Assert.Equal(3, result.Approach.MidActiveLights);
+            Assert.True(result.Approach.MidFirstLightYellow);
+            Assert.True(result.Approach.MidThirdLightOrange);
+            Assert.True(result.Approach.MidFourthLightInactive);
+            Assert.Equal(Visibility.Visible, result.Approach.TerminalPillVisibility);
+            Assert.Equal("UPSHIFT", result.Approach.TerminalPillText);
+            Assert.Equal(Visibility.Collapsed, result.Approach.TerminalApproachVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Approach.GatedApproachVisibility);
+            Assert.Equal(Visibility.Visible, result.Approach.GatedPlaceholderVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Approach.BelowWindowApproachVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Approach.NoTargetApproachVisibility);
+            Assert.Equal(Visibility.Visible, result.Approach.GearChangeApproachVisibility);
+            Assert.Equal(3, result.Approach.GearChangeActiveLights);
+            Assert.Equal(Visibility.Collapsed, result.Approach.NoDataApproachVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Approach.NoDataPillVisibility);
+            Assert.Equal(Visibility.Visible, result.Approach.ReentryApproachVisibility);
         }
         finally
         {
@@ -103,6 +127,7 @@ public sealed class PanelWindowDragTests
             return new WpfResult(
                 RaiseMouseDrag(configPath),
                 RenderShiftCue(),
+                RenderApproachCue(),
                 RenderShiftCueModes());
         }
         finally
@@ -268,6 +293,126 @@ public sealed class PanelWindowDragTests
             placeholderVisibility,
             placeholderLightVisibility,
             clickThroughWindowVisibility);
+    }
+
+    private static ApproachCueResult RenderApproachCue()
+    {
+        var state = new HudState();
+        state.Initialize(portOverride: 0);
+        SeedShiftAdvisor(state);
+        EnsureClickThroughOff();
+
+        long clock = 30_000;
+        var shiftCue = new ShiftCuePanel(state, () => clock);
+        shiftCue.Show();
+        shiftCue.UpdateLayout();
+
+        Border Approach() => (Border)shiftCue.FindName("ShiftApproach")!;
+        Border Placeholder() => (Border)shiftCue.FindName("ShiftPlaceholder")!;
+        Border Pill() => (Border)shiftCue.FindName("ShiftLight")!;
+        Shapes.Ellipse Light(int index) => (Shapes.Ellipse)shiftCue.FindName($"ApproachLight{index}")!;
+        // Gear 1 shift point is 6200 → approach window [4960, 6200).
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4960f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility windowStartApproachVisibility = Approach().Visibility;
+        int windowStartActiveLights = CountActiveLights(shiftCue);
+        bool windowStartFirstLightYellow =
+            ReferenceEquals(shiftCue.FindResource("ShiftLightYellowBrush"), Light(1).Fill);
+        bool windowStartSecondLightInactive =
+            ReferenceEquals(shiftCue.FindResource("ShiftLightInactiveBrush"), Light(2).Fill);
+
+        // 5580 → progress 0.5 → three lights: two yellow, one orange.
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 5580f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility midApproachVisibility = Approach().Visibility;
+        int midActiveLights = CountActiveLights(shiftCue);
+        bool midFirstLightYellow = ReferenceEquals(shiftCue.FindResource("ShiftLightYellowBrush"), Light(1).Fill);
+        bool midThirdLightOrange = ReferenceEquals(shiftCue.FindResource("ShiftLightOrangeBrush"), Light(3).Fill);
+        bool midFourthLightInactive =
+            ReferenceEquals(shiftCue.FindResource("ShiftLightInactiveBrush"), Light(4).Fill);
+
+        // 6200 → the terminal latch owns the shift point: pill replaces lights.
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 6200f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility terminalPillVisibility = Pill().Visibility;
+        string terminalPillText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        Visibility terminalApproachVisibility = Approach().Visibility;
+
+        // Throttle gate: below 200/255 the approach cue must stay neutral.
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 5580f, accel: 100));
+        shiftCue.RenderTick();
+        Visibility gatedApproachVisibility = Approach().Visibility;
+        Visibility gatedPlaceholderVisibility = Placeholder().Visibility;
+
+        // Below the approach window: no cue.
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4800f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility belowWindowApproachVisibility = Approach().Visibility;
+
+        // Gear 3 has no learned shift point: no cue.
+        SetLiveState(state, CreatePacket(gear: 3, rpm: 5580f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility noTargetApproachVisibility = Approach().Visibility;
+
+        // Gear change into gear 2 (shift point 5850, window [4680, 5850)):
+        // 5265 is already inside that window → immediate recalculation.
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 5265f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility gearChangeApproachVisibility = Approach().Visibility;
+        int gearChangeActiveLights = CountActiveLights(shiftCue);
+
+        // Stale telemetry clears the cue.
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 5265f, accel: 255), live: false);
+        shiftCue.RenderTick();
+        Visibility noDataApproachVisibility = Approach().Visibility;
+        Visibility noDataPillVisibility = Pill().Visibility;
+
+        // Re-entry after the neutral state works.
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4960f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility reentryApproachVisibility = Approach().Visibility;
+
+        shiftCue.Close();
+        state.Dispose();
+        return new ApproachCueResult(
+            windowStartApproachVisibility,
+            windowStartActiveLights,
+            windowStartFirstLightYellow,
+            windowStartSecondLightInactive,
+            midApproachVisibility,
+            midActiveLights,
+            midFirstLightYellow,
+            midThirdLightOrange,
+            midFourthLightInactive,
+            terminalPillVisibility,
+            terminalPillText,
+            terminalApproachVisibility,
+            gatedApproachVisibility,
+            gatedPlaceholderVisibility,
+            belowWindowApproachVisibility,
+            noTargetApproachVisibility,
+            gearChangeApproachVisibility,
+            gearChangeActiveLights,
+            noDataApproachVisibility,
+            noDataPillVisibility,
+            reentryApproachVisibility);
+    }
+
+    private static int CountActiveLights(ShiftCuePanel shiftCue)
+    {
+        int count = 0;
+        for (int i = 1; i <= UpshiftApproach.LightCount; i++)
+        {
+            var fill = ((Shapes.Ellipse)shiftCue.FindName($"ApproachLight{i}")!).Fill;
+            if (ReferenceEquals(fill, shiftCue.FindResource("ShiftLightYellowBrush"))
+                || ReferenceEquals(fill, shiftCue.FindResource("ShiftLightOrangeBrush"))
+                || ReferenceEquals(fill, shiftCue.FindResource("ShiftLightRedBrush")))
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static void EnsureClickThroughOff()
@@ -479,6 +624,7 @@ public sealed class PanelWindowDragTests
     private readonly record struct WpfResult(
         DragResult Drag,
         ShiftCueResult LiveCue,
+        ApproachCueResult Approach,
         ShiftCueModeResult Modes);
 
     private readonly record struct ShiftCueResult(
@@ -515,4 +661,27 @@ public sealed class PanelWindowDragTests
         Visibility PlaceholderVisibility,
         Visibility PlaceholderLightVisibility,
         Visibility ClickThroughWindowVisibility);
+
+    private readonly record struct ApproachCueResult(
+        Visibility WindowStartApproachVisibility,
+        int WindowStartActiveLights,
+        bool WindowStartFirstLightYellow,
+        bool WindowStartSecondLightInactive,
+        Visibility MidApproachVisibility,
+        int MidActiveLights,
+        bool MidFirstLightYellow,
+        bool MidThirdLightOrange,
+        bool MidFourthLightInactive,
+        Visibility TerminalPillVisibility,
+        string TerminalPillText,
+        Visibility TerminalApproachVisibility,
+        Visibility GatedApproachVisibility,
+        Visibility GatedPlaceholderVisibility,
+        Visibility BelowWindowApproachVisibility,
+        Visibility NoTargetApproachVisibility,
+        Visibility GearChangeApproachVisibility,
+        int GearChangeActiveLights,
+        Visibility NoDataApproachVisibility,
+        Visibility NoDataPillVisibility,
+        Visibility ReentryApproachVisibility);
 }
