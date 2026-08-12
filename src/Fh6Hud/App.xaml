@@ -28,7 +28,6 @@
         <SolidColorBrush x:Key="ReadyBrush" Color="#8796A8"/>
         <SolidColorBrush x:Key="TimingBrush" Color="#FFC857"/>
         <SolidColorBrush x:Key="DoneBrush" Color="#50E3A4"/>
-        <SolidColorBrush x:Key="ShiftUpFillBrush" Color="#59FF6B6B"/>
         <SolidColorBrush x:Key="ShiftDownFillBrush" Color="#594CB8FF"/>
         <SolidColorBrush x:Key="ShiftLightInactiveBrush" Color="#3E4D63"/>
         <SolidColorBrush x:Key="ShiftLightYellowBrush" Color="#FFC857"/>

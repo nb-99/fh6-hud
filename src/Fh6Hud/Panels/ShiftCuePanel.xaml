@@ -28,30 +28,13 @@
             </StackPanel>
         </Border>
 
-        <Border x:Name="ShiftLight"
-                Visibility="Collapsed"
-                Background="{StaticResource ShiftUpFillBrush}"
-                BorderBrush="{StaticResource HotBrush}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12,7">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock x:Name="ShiftLightArrow"
-                           Text="▲"
-                           FontFamily="Segoe UI Symbol"
-                           FontSize="24"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource HotBrush}"/>
-                <TextBlock x:Name="ShiftLightText"
-                           Text="UPSHIFT"
-                           FontSize="14"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource HotBrush}"
-                           VerticalAlignment="Center"
-                           Margin="9,0,0,0"/>
-            </StackPanel>
-        </Border>
-
+        <!--
+            Unified upshift indicator: six approach lights that fill
+            left-to-right (yellow, orange, red) during the final 20% of the
+            RPM distance to the learned shift point. At the terminal state
+            all six lights turn red and the triangle + UPSHIFT text appear in
+            the same component, which then blinks as a whole.
+        -->
         <Border x:Name="ShiftApproach"
                 Visibility="Collapsed"
                 Background="{StaticResource CardBrush}"
@@ -66,6 +49,51 @@
                 <Ellipse x:Name="ApproachLight4" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
                 <Ellipse x:Name="ApproachLight5" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
                 <Ellipse x:Name="ApproachLight6" Width="12" Height="12" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+                <!-- Collapsed while approaching; revealed only at the shift
+                     point so the component expands exactly as needed. -->
+                <StackPanel x:Name="ShiftApproachTerminal"
+                            Orientation="Horizontal"
+                            Visibility="Collapsed"
+                            VerticalAlignment="Center"
+                            Margin="9,0,0,0">
+                    <TextBlock x:Name="ShiftUpArrow"
+                               Text="▲"
+                               FontFamily="Segoe UI Symbol"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource HotBrush}"/>
+                    <TextBlock x:Name="ShiftUpText"
+                               Text="UPSHIFT"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource HotBrush}"
+                               VerticalAlignment="Center"
+                               Margin="9,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="ShiftDownPill"
+                Visibility="Collapsed"
+                Background="{StaticResource ShiftDownFillBrush}"
+                BorderBrush="{StaticResource ColdBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12,7">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock x:Name="ShiftDownArrow"
+                           Text="▼"
+                           FontFamily="Segoe UI Symbol"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource ColdBrush}"/>
+                <TextBlock x:Name="ShiftDownText"
+                           Text="DOWNSHIFT"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource ColdBrush}"
+                           VerticalAlignment="Center"
+                           Margin="9,0,0,0"/>
             </StackPanel>
         </Border>
     </Grid>

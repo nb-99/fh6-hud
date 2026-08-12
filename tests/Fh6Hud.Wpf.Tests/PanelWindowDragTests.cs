@@ -52,6 +52,8 @@ public sealed class PanelWindowDragTests
             Assert.Equal("UPSHIFT", result.LiveCue.UpCueText);
             Assert.Equal(Visibility.Visible, result.LiveCue.UpVisibility);
             Assert.Equal(Visibility.Collapsed, result.LiveCue.UpPlaceholderVisibility);
+            Assert.True(result.LiveCue.UpTerminalRevealed);
+            Assert.True(result.LiveCue.UpAllLightsRed);
             Assert.Equal("DOWNSHIFT", result.LiveCue.DownCueText);
             Assert.Equal("UPSHIFT", result.LiveCue.OverlapCueText);
             Assert.Equal("\u25B2", result.LiveCue.UpCueArrow);
@@ -59,27 +61,29 @@ public sealed class PanelWindowDragTests
             Assert.Equal(Visibility.Visible, result.LiveCue.UpCueVisibility);
             Assert.Equal(Visibility.Visible, result.LiveCue.DownCueVisibility);
             Assert.True(result.LiveCue.SimulatorSawUpshift);
-            Assert.True(result.LiveCue.UpUsesDedicatedPill);
             Assert.Equal(Visibility.Visible, result.LiveCue.DownVisibility);
             Assert.Equal(Visibility.Collapsed, result.LiveCue.DownPlaceholderVisibility);
             Assert.True(result.LiveCue.DownUsesDedicatedPill);
             Assert.Equal(Visibility.Visible, result.LiveCue.BlinkVisibility);
             Assert.Equal(0, result.LiveCue.BlinkOpacity);
-            Assert.Equal(Visibility.Visible, result.LiveCue.ClickThroughLightVisibility);
-            Assert.Equal(0, result.LiveCue.ClickThroughLightOpacity);
+            Assert.Equal(Visibility.Visible, result.LiveCue.ClickThroughComponentVisibility);
+            Assert.Equal(0, result.LiveCue.ClickThroughComponentOpacity);
             Assert.Equal(Visibility.Visible, result.LiveCue.ClickThroughCueVisibility);
             Assert.True(result.LiveCue.PlaceholderUsesSeparatePill);
             Assert.Equal(Visibility.Visible, result.LiveCue.PlaceholderArrowVisibility);
             Assert.Equal("UPSHIFT", result.LiveCue.ForcedUpCueText);
             Assert.Equal("\u25B2", result.LiveCue.ForcedUpCueArrow);
             Assert.Equal(Visibility.Visible, result.LiveCue.ForcedUpVisibility);
+            Assert.True(result.LiveCue.ForcedUpTerminalRevealed);
+            Assert.True(result.LiveCue.ForcedUpAllLightsRed);
             Assert.Equal("DOWNSHIFT", result.LiveCue.ForcedDownCueText);
             Assert.Equal("\u25BC", result.LiveCue.ForcedDownCueArrow);
             Assert.Equal(Visibility.Visible, result.LiveCue.ForcedDownVisibility);
 
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderWindowVisibility);
             Assert.Equal(Visibility.Visible, result.Modes.PlaceholderVisibility);
-            Assert.Equal(Visibility.Collapsed, result.Modes.PlaceholderLightVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Modes.PlaceholderCueVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Modes.PlaceholderDownVisibility);
             Assert.Equal(Visibility.Visible, result.Modes.ClickThroughWindowVisibility);
 
             // Progressive approach cue (issue #12).
@@ -92,9 +96,17 @@ public sealed class PanelWindowDragTests
             Assert.True(result.Approach.MidFirstLightYellow);
             Assert.True(result.Approach.MidThirdLightOrange);
             Assert.True(result.Approach.MidFourthLightInactive);
-            Assert.Equal(Visibility.Visible, result.Approach.TerminalPillVisibility);
-            Assert.Equal("UPSHIFT", result.Approach.TerminalPillText);
-            Assert.Equal(Visibility.Collapsed, result.Approach.TerminalApproachVisibility);
+            Assert.True(result.Approach.MidTerminalHidden);
+
+            // Unified terminal state (issue #13).
+            Assert.Equal(Visibility.Visible, result.Approach.TerminalComponentVisibility);
+            Assert.Equal("UPSHIFT", result.Approach.TerminalUpText);
+            Assert.True(result.Approach.TerminalRevealed);
+            Assert.True(result.Approach.TerminalAllLightsRed);
+            Assert.Equal(12.0, result.Approach.TerminalLightWidth);
+            Assert.Equal(Visibility.Visible, result.Approach.HysteresisComponentVisibility);
+            Assert.True(result.Approach.HysteresisRevealed);
+
             Assert.Equal(Visibility.Collapsed, result.Approach.GatedApproachVisibility);
             Assert.Equal(Visibility.Visible, result.Approach.GatedPlaceholderVisibility);
             Assert.Equal(Visibility.Collapsed, result.Approach.BelowWindowApproachVisibility);
@@ -102,7 +114,8 @@ public sealed class PanelWindowDragTests
             Assert.Equal(Visibility.Visible, result.Approach.GearChangeApproachVisibility);
             Assert.Equal(3, result.Approach.GearChangeActiveLights);
             Assert.Equal(Visibility.Collapsed, result.Approach.NoDataApproachVisibility);
-            Assert.Equal(Visibility.Collapsed, result.Approach.NoDataPillVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Approach.NoDataComponentVisibility);
+            Assert.Equal(Visibility.Collapsed, result.Approach.NoDataDownVisibility);
             Assert.Equal(Visibility.Visible, result.Approach.ReentryApproachVisibility);
         }
         finally
@@ -177,77 +190,82 @@ public sealed class PanelWindowDragTests
         shiftCue.UpdateLayout();
         SetLiveState(state, CreatePacket(gear: 1, rpm: 6500f, accel: 255));
         shiftCue.RenderTick();
-        string upCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
-        string upCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
-        Visibility upVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        Border Cue() => (Border)shiftCue.FindName("ShiftApproach")!;
+        StackPanel Terminal() => (StackPanel)shiftCue.FindName("ShiftApproachTerminal")!;
+        string upCueText = ((TextBlock)shiftCue.FindName("ShiftUpText")!).Text;
+        string upCueArrow = ((TextBlock)shiftCue.FindName("ShiftUpArrow")!).Text;
+        Visibility upVisibility = Cue().Visibility;
         Visibility upPlaceholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
-        bool upUsesDedicatedPill = ReferenceEquals(
-            shiftCue.FindResource("ShiftUpFillBrush"),
-            ((Border)shiftCue.FindName("ShiftLight")!).Background);
+        bool upTerminalRevealed = Terminal().Visibility == Visibility.Visible;
+        bool upAllLightsRed = AllLightsRed(shiftCue);
 
         clock += 200;
         shiftCue.RenderTick();
-        Visibility blinkVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
-        double blinkOpacity = ((Border)shiftCue.FindName("ShiftLight")!).Opacity;
+        Visibility blinkVisibility = Cue().Visibility;
+        double blinkOpacity = Cue().Opacity;
 
         clock += 200;
         var downshiftPacket = CreatePacket(gear: 2, rpm: 3800f, accel: 255);
         SetLiveState(state, downshiftPacket);
         shiftCue.RenderTick();
-        string downCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
-        string downCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
-        Visibility downVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        string downCueText = ((TextBlock)shiftCue.FindName("ShiftDownText")!).Text;
+        string downCueArrow = ((TextBlock)shiftCue.FindName("ShiftDownArrow")!).Text;
+        Visibility downVisibility = ((Border)shiftCue.FindName("ShiftDownPill")!).Visibility;
         Visibility downPlaceholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
         bool downUsesDedicatedPill = ReferenceEquals(
             shiftCue.FindResource("ShiftDownFillBrush"),
-            ((Border)shiftCue.FindName("ShiftLight")!).Background);
+            ((Border)shiftCue.FindName("ShiftDownPill")!).Background);
 
         ClickMenuItem(shiftCue, "Force UPSHIFT cue");
         SetLiveState(state, CreatePacket(gear: 2, rpm: 3500f, accel: 0));
         shiftCue.RenderTick();
-        string forcedUpCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
-        string forcedUpCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
-        Visibility forcedUpVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        string forcedUpCueText = ((TextBlock)shiftCue.FindName("ShiftUpText")!).Text;
+        string forcedUpCueArrow = ((TextBlock)shiftCue.FindName("ShiftUpArrow")!).Text;
+        Visibility forcedUpVisibility = Cue().Visibility;
+        bool forcedUpTerminalRevealed = Terminal().Visibility == Visibility.Visible;
+        bool forcedUpAllLightsRed = AllLightsRed(shiftCue);
         ClickMenuItem(shiftCue, "Force UPSHIFT cue");
 
         ClickMenuItem(shiftCue, "Force DOWNSHIFT cue");
         shiftCue.RenderTick();
-        string forcedDownCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
-        string forcedDownCueArrow = ((TextBlock)shiftCue.FindName("ShiftLightArrow")!).Text;
-        Visibility forcedDownVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        string forcedDownCueText = ((TextBlock)shiftCue.FindName("ShiftDownText")!).Text;
+        string forcedDownCueArrow = ((TextBlock)shiftCue.FindName("ShiftDownArrow")!).Text;
+        Visibility forcedDownVisibility = ((Border)shiftCue.FindName("ShiftDownPill")!).Visibility;
         ClickMenuItem(shiftCue, "Force DOWNSHIFT cue");
 
         ForceOverlappingAdvisorState(state.ShiftAdvisor);
         SetLiveState(state, CreatePacket(gear: 2, rpm: 3500f, accel: 255));
         shiftCue.RenderTick();
-        string overlapCueText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
+        string overlapCueText = ((TextBlock)shiftCue.FindName("ShiftUpText")!).Text;
         bool simulatorSawUpshift = ReplaySimulator(state, shiftCue);
         clock += 200;
         PanelWindow.ToggleClickThroughAll();
         shiftCue.RenderTick();
         Visibility clickThroughCueVisibility = shiftCue.Visibility;
-        Visibility clickThroughLightVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
-        double clickThroughLightOpacity = ((Border)shiftCue.FindName("ShiftLight")!).Opacity;
+        Visibility clickThroughComponentVisibility = Cue().Visibility;
+        double clickThroughComponentOpacity = Cue().Opacity;
         PanelWindow.ToggleClickThroughAll();
         SetLiveState(state, downshiftPacket, live: false);
         shiftCue.RenderTick();
         Visibility placeholderArrowVisibility = ((TextBlock)shiftCue.FindName("PlaceholderArrow")!).Visibility;
         bool placeholderUsesSeparatePill =
             ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility == Visibility.Visible
-            && ((Border)shiftCue.FindName("ShiftLight")!).Visibility == Visibility.Collapsed;
+            && Cue().Visibility == Visibility.Collapsed
+            && ((Border)shiftCue.FindName("ShiftDownPill")!).Visibility == Visibility.Collapsed;
         shiftCue.Close();
         state.Dispose();
         return new ShiftCueResult(
             upCueText,
             upVisibility,
             upPlaceholderVisibility,
+            upTerminalRevealed,
+            upAllLightsRed,
             overlapCueText,
             upCueArrow,
             downCueArrow,
             upVisibility,
             downVisibility,
             simulatorSawUpshift,
-            upUsesDedicatedPill,
             downCueText,
             downVisibility,
             downPlaceholderVisibility,
@@ -255,13 +273,15 @@ public sealed class PanelWindowDragTests
             blinkVisibility,
             blinkOpacity,
             clickThroughCueVisibility,
-            clickThroughLightVisibility,
-            clickThroughLightOpacity,
+            clickThroughComponentVisibility,
+            clickThroughComponentOpacity,
             placeholderUsesSeparatePill,
             placeholderArrowVisibility,
             forcedUpCueText,
             forcedUpCueArrow,
             forcedUpVisibility,
+            forcedUpTerminalRevealed,
+            forcedUpAllLightsRed,
             forcedDownCueText,
             forcedDownCueArrow,
             forcedDownVisibility);
@@ -279,7 +299,8 @@ public sealed class PanelWindowDragTests
         shiftCue.RenderTick();
         Visibility placeholderWindowVisibility = shiftCue.Visibility;
         Visibility placeholderVisibility = ((Border)shiftCue.FindName("ShiftPlaceholder")!).Visibility;
-        Visibility placeholderLightVisibility = ((Border)shiftCue.FindName("ShiftLight")!).Visibility;
+        Visibility placeholderCueVisibility = ((Border)shiftCue.FindName("ShiftApproach")!).Visibility;
+        Visibility placeholderDownVisibility = ((Border)shiftCue.FindName("ShiftDownPill")!).Visibility;
 
         PanelWindow.ToggleClickThroughAll();
         shiftCue.RenderTick();
@@ -291,7 +312,8 @@ public sealed class PanelWindowDragTests
         return new ShiftCueModeResult(
             placeholderWindowVisibility,
             placeholderVisibility,
-            placeholderLightVisibility,
+            placeholderCueVisibility,
+            placeholderDownVisibility,
             clickThroughWindowVisibility);
     }
 
@@ -309,7 +331,8 @@ public sealed class PanelWindowDragTests
 
         Border Approach() => (Border)shiftCue.FindName("ShiftApproach")!;
         Border Placeholder() => (Border)shiftCue.FindName("ShiftPlaceholder")!;
-        Border Pill() => (Border)shiftCue.FindName("ShiftLight")!;
+        Border DownPill() => (Border)shiftCue.FindName("ShiftDownPill")!;
+        StackPanel Terminal() => (StackPanel)shiftCue.FindName("ShiftApproachTerminal")!;
         Shapes.Ellipse Light(int index) => (Shapes.Ellipse)shiftCue.FindName($"ApproachLight{index}")!;
         // Gear 1 shift point is 6200 → approach window [4960, 6200).
         SetLiveState(state, CreatePacket(gear: 1, rpm: 4960f, accel: 255));
@@ -321,7 +344,8 @@ public sealed class PanelWindowDragTests
         bool windowStartSecondLightInactive =
             ReferenceEquals(shiftCue.FindResource("ShiftLightInactiveBrush"), Light(2).Fill);
 
-        // 5580 → progress 0.5 → three lights: two yellow, one orange.
+        // 5580 → progress 0.5 → three lights: two yellow, one orange. The
+        // terminal group stays collapsed so the component remains compact.
         SetLiveState(state, CreatePacket(gear: 1, rpm: 5580f, accel: 255));
         shiftCue.RenderTick();
         Visibility midApproachVisibility = Approach().Visibility;
@@ -330,13 +354,24 @@ public sealed class PanelWindowDragTests
         bool midThirdLightOrange = ReferenceEquals(shiftCue.FindResource("ShiftLightOrangeBrush"), Light(3).Fill);
         bool midFourthLightInactive =
             ReferenceEquals(shiftCue.FindResource("ShiftLightInactiveBrush"), Light(4).Fill);
+        bool midTerminalHidden = Terminal().Visibility == Visibility.Collapsed;
 
-        // 6200 → the terminal latch owns the shift point: pill replaces lights.
+        // 6200 → terminal latch: the same component reveals icon + text with
+        // all six lights red; the lights keep their fixed 12 px size.
         SetLiveState(state, CreatePacket(gear: 1, rpm: 6200f, accel: 255));
         shiftCue.RenderTick();
-        Visibility terminalPillVisibility = Pill().Visibility;
-        string terminalPillText = ((TextBlock)shiftCue.FindName("ShiftLightText")!).Text;
-        Visibility terminalApproachVisibility = Approach().Visibility;
+        Visibility terminalComponentVisibility = Approach().Visibility;
+        string terminalUpText = ((TextBlock)shiftCue.FindName("ShiftUpText")!).Text;
+        bool terminalRevealed = Terminal().Visibility == Visibility.Visible;
+        bool terminalAllLightsRed = AllLightsRed(shiftCue);
+        double terminalLightWidth = Light(1).Width;
+
+        // Hysteresis: a dip inside the 150 RPM latch band must keep the full
+        // terminal state — never a contradictory partially filled cue.
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 6150f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility hysteresisComponentVisibility = Approach().Visibility;
+        bool hysteresisRevealed = Terminal().Visibility == Visibility.Visible;
 
         // Throttle gate: below 200/255 the approach cue must stay neutral.
         SetLiveState(state, CreatePacket(gear: 1, rpm: 5580f, accel: 100));
@@ -365,7 +400,8 @@ public sealed class PanelWindowDragTests
         SetLiveState(state, CreatePacket(gear: 2, rpm: 5265f, accel: 255), live: false);
         shiftCue.RenderTick();
         Visibility noDataApproachVisibility = Approach().Visibility;
-        Visibility noDataPillVisibility = Pill().Visibility;
+        Visibility noDataComponentVisibility = Approach().Visibility;
+        Visibility noDataDownVisibility = DownPill().Visibility;
 
         // Re-entry after the neutral state works.
         SetLiveState(state, CreatePacket(gear: 1, rpm: 4960f, accel: 255));
@@ -384,9 +420,14 @@ public sealed class PanelWindowDragTests
             midFirstLightYellow,
             midThirdLightOrange,
             midFourthLightInactive,
-            terminalPillVisibility,
-            terminalPillText,
-            terminalApproachVisibility,
+            midTerminalHidden,
+            terminalComponentVisibility,
+            terminalUpText,
+            terminalRevealed,
+            terminalAllLightsRed,
+            terminalLightWidth,
+            hysteresisComponentVisibility,
+            hysteresisRevealed,
             gatedApproachVisibility,
             gatedPlaceholderVisibility,
             belowWindowApproachVisibility,
@@ -394,7 +435,8 @@ public sealed class PanelWindowDragTests
             gearChangeApproachVisibility,
             gearChangeActiveLights,
             noDataApproachVisibility,
-            noDataPillVisibility,
+            noDataComponentVisibility,
+            noDataDownVisibility,
             reentryApproachVisibility);
     }
 
@@ -413,6 +455,20 @@ public sealed class PanelWindowDragTests
         }
 
         return count;
+    }
+
+    private static bool AllLightsRed(ShiftCuePanel shiftCue)
+    {
+        for (int i = 1; i <= UpshiftApproach.LightCount; i++)
+        {
+            var fill = ((Shapes.Ellipse)shiftCue.FindName($"ApproachLight{i}")!).Fill;
+            if (!ReferenceEquals(fill, shiftCue.FindResource("ShiftLightRedBrush")))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void EnsureClickThroughOff()
@@ -456,9 +512,13 @@ public sealed class PanelWindowDragTests
             state.Tick();
             shiftCue.RenderTick();
 
-            var light = (Border)shiftCue.FindName("ShiftLight")!;
-            var text = (TextBlock)shiftCue.FindName("ShiftLightText")!;
-            if (text.Text == "UPSHIFT" && light.Visibility == Visibility.Visible)
+            var cue = (Border)shiftCue.FindName("ShiftApproach")!;
+            var terminal = (StackPanel)shiftCue.FindName("ShiftApproachTerminal")!;
+            var text = (TextBlock)shiftCue.FindName("ShiftUpText")!;
+            if (text.Text == "UPSHIFT"
+                && terminal.Visibility == Visibility.Visible
+                && cue.Visibility == Visibility.Visible
+                && cue.Opacity == 1)
             {
                 return true;
             }
@@ -631,13 +691,14 @@ public sealed class PanelWindowDragTests
         string UpCueText,
         Visibility UpVisibility,
         Visibility UpPlaceholderVisibility,
+        bool UpTerminalRevealed,
+        bool UpAllLightsRed,
         string OverlapCueText,
         string UpCueArrow,
         string DownCueArrow,
         Visibility UpCueVisibility,
         Visibility DownCueVisibility,
         bool SimulatorSawUpshift,
-        bool UpUsesDedicatedPill,
         string DownCueText,
         Visibility DownVisibility,
         Visibility DownPlaceholderVisibility,
@@ -645,13 +706,15 @@ public sealed class PanelWindowDragTests
         Visibility BlinkVisibility,
         double BlinkOpacity,
         Visibility ClickThroughCueVisibility,
-        Visibility ClickThroughLightVisibility,
-        double ClickThroughLightOpacity,
+        Visibility ClickThroughComponentVisibility,
+        double ClickThroughComponentOpacity,
         bool PlaceholderUsesSeparatePill,
         Visibility PlaceholderArrowVisibility,
         string ForcedUpCueText,
         string ForcedUpCueArrow,
         Visibility ForcedUpVisibility,
+        bool ForcedUpTerminalRevealed,
+        bool ForcedUpAllLightsRed,
         string ForcedDownCueText,
         string ForcedDownCueArrow,
         Visibility ForcedDownVisibility);
@@ -659,7 +722,8 @@ public sealed class PanelWindowDragTests
     private readonly record struct ShiftCueModeResult(
         Visibility PlaceholderWindowVisibility,
         Visibility PlaceholderVisibility,
-        Visibility PlaceholderLightVisibility,
+        Visibility PlaceholderCueVisibility,
+        Visibility PlaceholderDownVisibility,
         Visibility ClickThroughWindowVisibility);
 
     private readonly record struct ApproachCueResult(
@@ -672,9 +736,14 @@ public sealed class PanelWindowDragTests
         bool MidFirstLightYellow,
         bool MidThirdLightOrange,
         bool MidFourthLightInactive,
-        Visibility TerminalPillVisibility,
-        string TerminalPillText,
-        Visibility TerminalApproachVisibility,
+        bool MidTerminalHidden,
+        Visibility TerminalComponentVisibility,
+        string TerminalUpText,
+        bool TerminalRevealed,
+        bool TerminalAllLightsRed,
+        double TerminalLightWidth,
+        Visibility HysteresisComponentVisibility,
+        bool HysteresisRevealed,
         Visibility GatedApproachVisibility,
         Visibility GatedPlaceholderVisibility,
         Visibility BelowWindowApproachVisibility,
@@ -682,6 +751,7 @@ public sealed class PanelWindowDragTests
         Visibility GearChangeApproachVisibility,
         int GearChangeActiveLights,
         Visibility NoDataApproachVisibility,
-        Visibility NoDataPillVisibility,
+        Visibility NoDataComponentVisibility,
+        Visibility NoDataDownVisibility,
         Visibility ReentryApproachVisibility);
 }
