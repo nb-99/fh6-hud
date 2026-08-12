@@ -16,22 +16,28 @@ interval timers, engine/power data, and shift cues over the game window.
   engine bottom-right (right edge at 80% of screen width), interval timers on
   the right edge at 25% of screen height, speedometer below them, status
   bottom-middle.
-- **Shift advisor with big shift lights** — the HUD learns the car's power
-  curve and gear ratios from telemetry while you drive and computes the
+- **Shift advisor with progressive shift lights** — the HUD learns the car's
+  power curve and gear ratios from telemetry while you drive and computes the
   optimal shift points per gear (where the power you'd have after the shift
-  equals the power in the current gear). The centered shift-cue panel flashes a big
-  "▲ UPSHIFT" pill (red, at ~full throttle) when you reach the upshift
-  point, and a "▼ DOWNSHIFT" pill (blue, at ~half throttle) when a lower
+  equals the power in the current gear). The centered shift-cue panel shows
+  six lights that fill left-to-right (two yellow, two orange, two red) during
+  the final 20% of the RPM distance to the shift point (at ~full throttle),
+  giving an early at-a-glance countdown. At the shift point all six lights
+  turn red and "▲ UPSHIFT" appears inside the same component, which then
+  blinks. A "▼ DOWNSHIFT" pill (blue, at ~half throttle) shows when a lower
   gear would make more power — e.g. stuck in a gear too high after a corner.
   Downshifts are only suggested when the post-shift RPM lands at least
   400 RPM below the lower gear's own shift point (and its redline), so the
   advice never bounces you off the rev limiter or into an immediate
   upshift/downshift loop — a little less power in the higher gear beats
-  hitting the limiter. The title shows the learned point ("SHIFT @ 6400").
-  The live cue is a separate centered panel that can be dragged into the
-  driver's field of view and shows a `SHIFT CUE` placeholder while editing.
-  It self-calibrates per car after a few full-throttle pulls — no car
-  database.
+  hitting the limiter. The engine title shows the learned point
+  ("SHIFT @ 6400"), "SHIFT LEARNING" while the current gear is still being
+  learned, and "SHIFT --" in the top gear, neutral, or reverse. The cue is a
+  separate centered panel that can be dragged into the driver's field of view
+  and shows a `SHIFT CUE` placeholder while editing. It self-calibrates per
+  car after a few full-throttle pulls — no car database. If the car pulls
+  flat to the limiter, shifting at redline *is* optimal and the progressive
+  cue simply runs its six lights up to the redline before going all-red.
 - **Tire temperature monitor** — live per-corner temps (FL / FR / RL / RR),
   colored by whether each tire is *cold*, *in its optimal operating range*, or
   *too hot*, based on the selected tire compound.
@@ -215,20 +221,22 @@ docs/fh6-data-out.md        official FH6 Data Out spec snapshot
   compound you select.
 - **Power curve is empty** — it fills in while driving; do a full-throttle
   pull through the rev range. The curve resets when you switch cars.
-- **Shift indicator stays "SHIFT --" / no lights** — the advisor needs both
-  the power curve and the gear ratios to be learned: do a few full-throttle
+- **Shift indicator stays "SHIFT LEARNING" / no lights** — the advisor needs
+  both the power curve and the gear ratios to be learned: do a few full-throttle
   pulls through the gears (one pull through every gear is enough; the engine
   panel learns gear ratios as rpm-per-speed while you drive with the clutch
   fully engaged and no wheelspin). It also needs the next gear's post-shift
   rev range to have been sampled — i.e. you must actually drive each gear.
-  Advice only appears in manual gears; in `D` and in the top gear there is
-  none. Everything resets when you switch cars. If the power curve keeps
-  falling after its peak, the upshift point sits below redline; if the car
-  pulls flat to the limiter, shifting at redline *is* optimal and the light
-  flashes there. The downshift light additionally requires a real power gain
-  (≥1.5%) and keeps 400 RPM of headroom below the lower gear's shift point,
-  so it stays quiet near the boundary, on flat power curves, and right after
-  an upshift at the limiter (no shift-down-into-limiter bounce).
+  The engine title reads `SHIFT LEARNING` while the current gear has not
+  produced a shift point yet, and stays `SHIFT --` only where no point can
+  ever exist: the top gear, neutral, and reverse. Everything resets when you
+  switch cars. If the power curve keeps falling after its peak, the upshift
+  point sits below redline; if the car pulls flat to the limiter, shifting at
+  redline *is* optimal and the six lights run up to red before the cue turns
+  all-red and blinks there. The downshift light additionally requires a real
+  power gain (≥1.5%) and keeps 400 RPM of headroom below the lower gear's
+  shift point, so it stays quiet near the boundary, on flat power curves, and
+  right after an upshift at the limiter (no shift-down-into-limiter bounce).
 - **Shift indicators work in the simulator/edit mode but not in game** — the
   game uses click-through mode, which makes the HUD windows layered and
   transparent. The shift-cue window must remain mounted in that mode; collapsing

@@ -55,10 +55,19 @@ public partial class EnginePanel : PanelWindow
             ? State.ShiftAdvisor.GetShiftRpm(packet.Gear)
             : null;
 
-        // Title: steady hint with the learned upshift point for this gear.
-        SetText(ShiftText, shiftRpm is { } rpm ? $"SHIFT @ {rpm:F0}" : "SHIFT --");
-        ShiftText.Foreground = shiftRpm is null ? _mutedBrush : _accentBrush;
+        // The top gear can never produce a shift point (no next gear to
+        // compare against), and reverse/neutral are non-applicable — those
+        // keep the neutral "SHIFT --". A learnable forward gear that has not
+        // yet produced a point is "learning" (data still insufficient).
+        bool learning = shiftRpm is null
+                        && GearRatioTracker.IsLearnableGear(packet.Gear)
+                        && packet.Gear < GearRatioTracker.MaxForwardGear;
 
+        // Title: steady hint with the learned upshift point for this gear.
+        SetText(
+            ShiftText,
+            shiftRpm is { } rpm ? $"SHIFT @ {rpm:F0}" : learning ? "SHIFT LEARNING" : "SHIFT --");
+        ShiftText.Foreground = shiftRpm is null ? _mutedBrush : _accentBrush;
     }
 
     private void RebuildPowerCurve()

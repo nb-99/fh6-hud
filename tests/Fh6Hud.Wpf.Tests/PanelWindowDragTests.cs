@@ -117,6 +117,22 @@ public sealed class PanelWindowDragTests
             Assert.Equal(Visibility.Collapsed, result.Approach.NoDataComponentVisibility);
             Assert.Equal(Visibility.Collapsed, result.Approach.NoDataDownVisibility);
             Assert.Equal(Visibility.Visible, result.Approach.ReentryApproachVisibility);
+
+            // Lifecycle and arbitration (issue #14).
+            Assert.Equal(Visibility.Visible, result.LearningAndPriority.LearningDownVisibility);
+            Assert.Equal(Visibility.Collapsed, result.LearningAndPriority.LearningCueVisibility);
+            Assert.Equal(Visibility.Visible, result.LearningAndPriority.PriorityCueVisibility);
+            Assert.Equal(Visibility.Collapsed, result.LearningAndPriority.PriorityDownVisibility);
+            Assert.Equal(Visibility.Collapsed, result.LearningAndPriority.GatedExitVisibility);
+            Assert.Equal(Visibility.Visible, result.LearningAndPriority.GateReentryVisibility);
+            Assert.Equal(3, result.LearningAndPriority.GateReentryLights);
+
+            // Engine panel learning status (issue #14).
+            Assert.Equal("SHIFT @ 6200", result.EngineShiftHint.LearnedText);
+            Assert.Equal("SHIFT LEARNING", result.EngineShiftHint.LearningText);
+            Assert.Equal("SHIFT --", result.EngineShiftHint.TopGearText);
+            Assert.Equal("SHIFT --", result.EngineShiftHint.NeutralText);
+            Assert.Equal("SHIFT --", result.EngineShiftHint.ReverseText);
         }
         finally
         {
@@ -141,7 +157,9 @@ public sealed class PanelWindowDragTests
                 RaiseMouseDrag(configPath),
                 RenderShiftCue(),
                 RenderApproachCue(),
-                RenderShiftCueModes());
+                RenderShiftCueModes(),
+                RenderLearningAndPriority(),
+                RenderEngineShiftHint());
         }
         finally
         {
@@ -471,6 +489,106 @@ public sealed class PanelWindowDragTests
         return true;
     }
 
+    private static LearningAndPriorityResult RenderLearningAndPriority()
+    {
+        var state = new HudState();
+        state.Initialize(portOverride: 0);
+        SeedShiftAdvisor(state);
+        EnsureClickThroughOff();
+
+        long clock = 40_000;
+        var shiftCue = new ShiftCuePanel(state, () => clock);
+        shiftCue.Show();
+        shiftCue.UpdateLayout();
+
+        Border Cue() => (Border)shiftCue.FindName("ShiftApproach")!;
+        Border DownPill() => (Border)shiftCue.FindName("ShiftDownPill")!;
+
+        // Gear 3 is still learning its upshift point (no shift RPM learned);
+        // a valid downshift recommendation must remain visible.
+        SetLiveState(state, CreatePacket(gear: 3, rpm: 3800f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility learningDownVisibility = DownPill().Visibility;
+        Visibility learningCueVisibility = Cue().Visibility;
+
+        // Overlap: gear 2's shift point is forced to 4800, so the approach
+        // window [3840, 4800) overlaps the gear-2 downshift threshold (~3867).
+        // At 3850 both recommendations would fire; the progressive upshift
+        // cue must win the shared panel.
+        ForceApproachDownshiftOverlap(state.ShiftAdvisor);
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 3850f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility priorityCueVisibility = Cue().Visibility;
+        Visibility priorityDownVisibility = DownPill().Visibility;
+
+        // Throttle-gate exit hides the cue; re-entering the gate recomputes
+        // the current progress immediately.
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 4200f, accel: 100));
+        shiftCue.RenderTick();
+        Visibility gatedExitVisibility = Cue().Visibility;
+        SetLiveState(state, CreatePacket(gear: 2, rpm: 4200f, accel: 255));
+        shiftCue.RenderTick();
+        Visibility gateReentryVisibility = Cue().Visibility;
+        int gateReentryLights = CountActiveLights(shiftCue);
+
+        shiftCue.Close();
+        state.Dispose();
+        return new LearningAndPriorityResult(
+            learningDownVisibility,
+            learningCueVisibility,
+            priorityCueVisibility,
+            priorityDownVisibility,
+            gatedExitVisibility,
+            gateReentryVisibility,
+            gateReentryLights);
+    }
+
+    private static EngineShiftHintResult RenderEngineShiftHint()
+    {
+        var state = new HudState();
+        state.Initialize(portOverride: 0);
+        SeedShiftAdvisor(state);
+        EnsureClickThroughOff();
+
+        var engine = new EnginePanel(state);
+        engine.Show();
+        engine.UpdateLayout();
+
+        TextBlock ShiftText() => (TextBlock)engine.FindName("ShiftText")!;
+
+        // Gear 1 has a learned shift point → "SHIFT @ 6200".
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4000f, accel: 0));
+        engine.RenderTick();
+        string learnedText = ShiftText().Text;
+
+        // Gear 3 is learnable but has not produced a point yet → learning.
+        SetLiveState(state, CreatePacket(gear: 3, rpm: 4000f, accel: 0));
+        engine.RenderTick();
+        string learningText = ShiftText().Text;
+
+        // Top gear (10) is learnable but can never produce a point → SHIFT --.
+        SetLiveState(state, CreatePacket(gear: 10, rpm: 4000f, accel: 0));
+        engine.RenderTick();
+        string topGearText = ShiftText().Text;
+
+        // Neutral (11) and reverse (0) are non-applicable → SHIFT --.
+        SetLiveState(state, CreatePacket(gear: 11, rpm: 900f, accel: 0));
+        engine.RenderTick();
+        string neutralText = ShiftText().Text;
+        SetLiveState(state, CreatePacket(gear: 0, rpm: 900f, accel: 0));
+        engine.RenderTick();
+        string reverseText = ShiftText().Text;
+
+        engine.Close();
+        state.Dispose();
+        return new EngineShiftHintResult(
+            learnedText,
+            learningText,
+            topGearText,
+            neutralText,
+            reverseText);
+    }
+
     private static void EnsureClickThroughOff()
     {
         if (PanelWindow.ClickThrough)
@@ -493,6 +611,24 @@ public sealed class PanelWindowDragTests
             .GetField("_shiftRpmByGear", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(advisor)!;
         shiftRpmByGear[2] = 3000f;
+        typeof(ShiftPointAdvisor).GetField("_downLatched", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(advisor, true);
+        typeof(ShiftPointAdvisor).GetField("_downLatchedGear", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(advisor, 2);
+    }
+
+    /// <summary>
+    /// Forces gear 2's shift point to 4800 so its approach window
+    /// [3840, 4800) overlaps the gear-2 downshift threshold (~3867 RPM,
+    /// derived from gear 1's learned point) — the state where progressive
+    /// upshift and downshift advice would otherwise fight over the panel.
+    /// </summary>
+    private static void ForceApproachDownshiftOverlap(ShiftPointAdvisor advisor)
+    {
+        var shiftRpmByGear = (Dictionary<int, float>)typeof(ShiftPointAdvisor)
+            .GetField("_shiftRpmByGear", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(advisor)!;
+        shiftRpmByGear[2] = 4800f;
         typeof(ShiftPointAdvisor).GetField("_downLatched", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(advisor, true);
         typeof(ShiftPointAdvisor).GetField("_downLatchedGear", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -685,7 +821,9 @@ public sealed class PanelWindowDragTests
         DragResult Drag,
         ShiftCueResult LiveCue,
         ApproachCueResult Approach,
-        ShiftCueModeResult Modes);
+        ShiftCueModeResult Modes,
+        LearningAndPriorityResult LearningAndPriority,
+        EngineShiftHintResult EngineShiftHint);
 
     private readonly record struct ShiftCueResult(
         string UpCueText,
@@ -754,4 +892,20 @@ public sealed class PanelWindowDragTests
         Visibility NoDataComponentVisibility,
         Visibility NoDataDownVisibility,
         Visibility ReentryApproachVisibility);
+
+    private readonly record struct LearningAndPriorityResult(
+        Visibility LearningDownVisibility,
+        Visibility LearningCueVisibility,
+        Visibility PriorityCueVisibility,
+        Visibility PriorityDownVisibility,
+        Visibility GatedExitVisibility,
+        Visibility GateReentryVisibility,
+        int GateReentryLights);
+
+    private readonly record struct EngineShiftHintResult(
+        string LearnedText,
+        string LearningText,
+        string TopGearText,
+        string NeutralText,
+        string ReverseText);
 }

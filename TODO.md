@@ -1,8 +1,10 @@
 # TODO
 
-## [ ] Upshift indicator improvement
+## [x] Upshift indicator improvement — resolved in issue #11
 
 **"Steering-wheel light"-like experience:** Implement a visual cue similar to a steering-wheel light to indicate optimal upshift timing with an earlier signal that an upshift is coming up and how much time is left until the optimal upshift point. Sports cars often have a row of ligts in the top of the steering wheel that light up in sequence as the engine approaches the optimal upshift point. This could be implemented in the HUD as a series of lights or a bar that fills up as the engine approaches the optimal upshift point, providing a clear and intuitive visual cue for the driver, instead of only the existing flashing pill that only appears when the optimal upshift point is reached.
+
+Shipped in issues #12–#14: six progressive lights (two yellow, two orange, two red) fill left-to-right during the final 20% of the RPM distance to the learned shift point; at the point all six turn red and "▲ UPSHIFT" reveals inside the same component, which then blinks. The engine title shows `SHIFT LEARNING` while a gear is being learned. Redline fallback (no power crossover) runs the same progression to the limiter.
 
 ## [ ] Configurable Panels
 
