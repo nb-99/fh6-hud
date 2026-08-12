@@ -1,16 +1,23 @@
 # TODO
 
+## [ ] Upshift indicator improvement
+
+**"Steering-wheel light"-like experience:** Implement a visual cue similar to a steering-wheel light to indicate optimal upshift timing with an earlier signal that an upshift is coming up and how much time is left until the optimal upshift point. Sports cars often have a row of ligts in the top of the steering wheel that light up in sequence as the engine approaches the optimal upshift point. This could be implemented in the HUD as a series of lights or a bar that fills up as the engine approaches the optimal upshift point, providing a clear and intuitive visual cue for the driver, instead of only the existing flashing pill that only appears when the optimal upshift point is reached.
+
+## [ ] Configurable Panels
+
+**Hideable:** Panels should be individually hideable/deactivatable, either manually or by certain conditions (e.g. when tire temp has not changed in the last 10 secs e.g. when in the tuning menu, hide the tire temp panel)
+**Resizable:** Panels should be resizable via dragging their edges and their size persisted alongside their position in config.json
+**Persistent Positioning:** Panels should be able to be moved around the screen and their dragged position saved. This would allow users to customize their HUD layout to their liking by dragging, instead of only via the config.json initial positioning.
+
+## [ ] Update README
+
+**Outdated:** The README is outdated and needs to be updated to reflect the current state of the project, including new features, installation instructions, and usage guidelines. It also should be shorter, more visually appealing, and include screenshots or gifs/videos.
+
 ## [ ] Tire temps
 
 **Temperature Ranges:** Verify correct tire operating temperature ranges.
 **Visibility:** Resolved in issue #4: the state and signed delta are larger and sit above the current temperature.
-
-## [x] UI Readability — resolved in issue #4
-
-**Visibility:** Many elements, especially text, are barely readable or out of primaty vision. Texts should not be as small as current smaller texts for data that is relevant durint racing, where primary attention is on driving and data should be easily visible at a glance.
-**Positioning:** Some elements would benefit from being placed separately from their current panel. Primary example being the Upshift/Downshift indicator, which could be moved to the middle and be a bit larger to be placeable directly in the FOV of the road/car.
-
-## [x] Hooks and CI for linting, validations etc — resolved in issue #4
 
 ## [ ] Makefile
 
@@ -19,10 +26,12 @@
 **make dev:** runs the devbuild
 **make test:** runs tests
 
-## [ ] Configurable Panels
+## [x] UI Readability — resolved in issue #4
 
-**Hideable:** Panels should be individually hideable/deactivatable, either manually or by certain conditions (e.g. when tire temp has not changed in the last 10 secs e.g. when in the tuning menu, hide the tire temp panel)
-**Resizable:** Panels should be resizable via dragging their edges and their size persisted alongside their position in config.json
+**Visibility:** Many elements, especially text, are barely readable or out of primaty vision. Texts should not be as small as current smaller texts for data that is relevant durint racing, where primary attention is on driving and data should be easily visible at a glance.
+**Positioning:** Some elements would benefit from being placed separately from their current panel. Primary example being the Upshift/Downshift indicator, which could be moved to the middle and be a bit larger to be placeable directly in the FOV of the road/car.
+
+## [x] Hooks and CI for linting, validations etc — resolved in issue #4
 
 ## [x] Rev bar — resolved (2026-08-07)
 

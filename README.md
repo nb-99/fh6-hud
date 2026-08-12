@@ -1,9 +1,8 @@
 # FH6 HUD
 
 An always-on-top telemetry overlay for **Forza Horizon 6**, built with C# / WPF
-(.NET 10). It reads the game's "Data Out" UDP stream (324-byte packets, up to
-60 Hz) and displays tire temperatures, interval timers, and engine/power data
-over the game window.
+(.NET 10). It reads the game's "Data Out" UDP stream and displays tire temperatures,
+interval timers, engine/power data, and shift cues over the game window.
 
 ![stack](https://img.shields.io/badge/C%23-.NET%2010%20(WPF)-512BD4)
 
