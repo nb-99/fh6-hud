@@ -25,12 +25,6 @@ public partial class ShiftCuePanel : PanelWindow
     /// <summary>Throttle input (0-255) above which the downshift light is shown.</summary>
     private const byte DownshiftThrottleThreshold = 128;
 
-    private readonly SolidColorBrush _coldBrush;
-    private readonly SolidColorBrush _hotBrush;
-    private readonly SolidColorBrush _mutedBrush;
-    private readonly SolidColorBrush _cardBrush;
-    private readonly SolidColorBrush _shiftUpFillBrush;
-    private readonly SolidColorBrush _shiftDownFillBrush;
     private readonly SolidColorBrush _shiftLightInactiveBrush;
     private readonly SolidColorBrush _shiftLightYellowBrush;
     private readonly SolidColorBrush _shiftLightOrangeBrush;
@@ -51,12 +45,6 @@ public partial class ShiftCuePanel : PanelWindow
     {
         InitializeComponent();
 
-        _coldBrush = (SolidColorBrush)FindResource("ColdBrush");
-        _hotBrush = (SolidColorBrush)FindResource("HotBrush");
-        _mutedBrush = (SolidColorBrush)FindResource("MutedBrush");
-        _cardBrush = (SolidColorBrush)FindResource("CardBrush");
-        _shiftUpFillBrush = (SolidColorBrush)FindResource("ShiftUpFillBrush");
-        _shiftDownFillBrush = (SolidColorBrush)FindResource("ShiftDownFillBrush");
         _shiftLightInactiveBrush = (SolidColorBrush)FindResource("ShiftLightInactiveBrush");
         _shiftLightYellowBrush = (SolidColorBrush)FindResource("ShiftLightYellowBrush");
         _shiftLightOrangeBrush = (SolidColorBrush)FindResource("ShiftLightOrangeBrush");
@@ -90,8 +78,9 @@ public partial class ShiftCuePanel : PanelWindow
         // Progressive approach cue: an early, throttle-gated warning while the
         // engine is inside the final 20% RPM window below the advisor's shift
         // point. The terminal latch (up) owns the shift point itself, so the
-        // cue stops exactly where the pill begins. Priority over downshift
-        // advice mirrors the terminal upshift arbitration — one clear action.
+        // cue stops exactly where the unified terminal state begins. Priority
+        // over downshift advice mirrors the terminal upshift arbitration —
+        // one clear action.
         bool approach = !up && !forceDown
                         && upRpm is { } target
                         && upGate
@@ -131,30 +120,33 @@ public partial class ShiftCuePanel : PanelWindow
             bool newlyActivated = _activeCue != direction;
             _activeCue = direction;
 
-            // Always expose the first frame of a new recommendation. Real
-            // drivers can shift again within one 200 ms blink phase; using
-            // only the global phase would otherwise make the placeholder
-            // disappear while the live pill remains hidden for the entire
-            // recommendation.
-            ShiftLight.Visibility = Visibility.Visible;
-            ShiftLight.Opacity = newlyActivated || (now / 200) % 2 == 0 ? 1 : 0;
-            ShiftApproach.Visibility = Visibility.Collapsed;
+            // Terminal state: the unified component keeps its six lights (now
+            // all red) and reveals the triangle + UPSHIFT text inside the same
+            // border. The whole component blinks with the established cadence.
+            // Always expose the first frame of a new recommendation: a re-entry
+            // from the approach cue or a blink-off phase must never blank it.
+            ShiftApproach.Visibility = Visibility.Visible;
+            ShiftApproach.Opacity = newlyActivated || (now / 200) % 2 == 0 ? 1 : 0;
+            ShiftDownPill.Visibility = Visibility.Collapsed;
+            ShiftDownPill.Opacity = 1;
 
-            ShiftLightArrow.Text = "▲";
-            ShiftLightText.Text = "UPSHIFT";
-            ShiftLightArrow.Foreground = _hotBrush;
-            ShiftLightText.Foreground = _hotBrush;
-            ShiftLight.Background = _shiftUpFillBrush;
-            ShiftLight.BorderBrush = _hotBrush;
+            for (int i = 0; i < _approachLights.Length; i++)
+            {
+                _approachLights[i].Fill = _shiftLightRedBrush;
+            }
+
+            ShiftApproachTerminal.Visibility = Visibility.Visible;
         }
         else if (approach)
         {
             // The approach cue is a steady (non-blinking) countdown; the
-            // established blink cadence applies only to the terminal pill.
+            // established blink cadence applies only to the terminal state.
             _activeCue = null;
-            ShiftLight.Visibility = Visibility.Collapsed;
-            ShiftLight.Opacity = 1;
             ShiftApproach.Visibility = Visibility.Visible;
+            ShiftApproach.Opacity = 1;
+            ShiftApproachTerminal.Visibility = Visibility.Collapsed;
+            ShiftDownPill.Visibility = Visibility.Collapsed;
+            ShiftDownPill.Opacity = 1;
 
             int activeLights = UpshiftApproach.ActiveLightCount(packet.CurrentEngineRpm, upRpm!.Value);
             for (int i = 0; i < _approachLights.Length; i++)
@@ -171,16 +163,10 @@ public partial class ShiftCuePanel : PanelWindow
             bool newlyActivated = _activeCue != direction;
             _activeCue = direction;
 
-            ShiftLight.Visibility = Visibility.Visible;
-            ShiftLight.Opacity = newlyActivated || (now / 200) % 2 == 0 ? 1 : 0;
+            ShiftDownPill.Visibility = Visibility.Visible;
+            ShiftDownPill.Opacity = newlyActivated || (now / 200) % 2 == 0 ? 1 : 0;
             ShiftApproach.Visibility = Visibility.Collapsed;
-
-            ShiftLightArrow.Text = "▼";
-            ShiftLightText.Text = "DOWNSHIFT";
-            ShiftLightArrow.Foreground = _coldBrush;
-            ShiftLightText.Foreground = _coldBrush;
-            ShiftLight.Background = _shiftDownFillBrush;
-            ShiftLight.BorderBrush = _coldBrush;
+            ShiftApproach.Opacity = 1;
         }
 
         LogDiagnostic(
@@ -193,9 +179,11 @@ public partial class ShiftCuePanel : PanelWindow
             downGate,
             upRpm,
             downRpm,
-            approachLights: approach
-                ? UpshiftApproach.ActiveLightCount(packet.CurrentEngineRpm, upRpm!.Value)
-                : 0);
+            approachLights: up
+                ? UpshiftApproach.LightCount
+                : approach
+                    ? UpshiftApproach.ActiveLightCount(packet.CurrentEngineRpm, upRpm!.Value)
+                    : 0);
     }
 
     protected override void RenderNoData()
@@ -211,7 +199,7 @@ public partial class ShiftCuePanel : PanelWindow
 
         ShowPlaceholderOrHide();
         LogNoDataHealth();
-        string key = $"NODATA|{State.Live}|{ClickThrough}|{Visibility}|{ShiftPlaceholder.Visibility}|{ShiftLight.Visibility}";
+        string key = $"NODATA|{State.Live}|{ClickThrough}|{Visibility}|{ShiftPlaceholder.Visibility}|{ShiftApproach.Visibility}|{ShiftDownPill.Visibility}";
         if (string.Equals(key, _lastDiagnosticKey, StringComparison.Ordinal))
         {
             return;
@@ -221,7 +209,8 @@ public partial class ShiftCuePanel : PanelWindow
         _lastDiagnosticAt = Environment.TickCount64;
         HudLog.Debug(
             $"[SHIFT-DIAG] mode=NODATA live={State.Live} clickThrough={ClickThrough} " +
-            $"window={Visibility} placeholder={ShiftPlaceholder.Visibility} light={ShiftLight.Visibility}");
+            $"window={Visibility} placeholder={ShiftPlaceholder.Visibility} " +
+            $"cue={ShiftApproach.Visibility} down={ShiftDownPill.Visibility}");
     }
 
     private void LogDiagnostic(
@@ -260,7 +249,7 @@ public partial class ShiftCuePanel : PanelWindow
         _lastDiagnosticAt = now;
         HudLog.Debug(
             $"[SHIFT-DIAG] mode={mode} live={State.Live} clickThrough={ClickThrough} " +
-            $"window={Visibility} light={ShiftLight.Visibility} gear={packet.Gear} " +
+            $"window={Visibility} cue={ShiftApproach.Visibility} down={ShiftDownPill.Visibility} gear={packet.Gear} " +
             $"rpm={packet.CurrentEngineRpm.ToString("F0", CultureInfo.InvariantCulture)} " +
             $"maxRpm={packet.EngineMaxRpm.ToString("F0", CultureInfo.InvariantCulture)} " +
             $"accel={packet.Accel} brake={packet.Brake} clutch={packet.Clutch} " +
@@ -287,7 +276,7 @@ public partial class ShiftCuePanel : PanelWindow
     {
         string key =
             $"{mode}|{State.Live}|{ClickThrough}|{Visibility}|{IsVisible}|" +
-            $"{ShiftLight.Visibility}|{ShiftPlaceholder.Visibility}|{_forcedCue}|" +
+            $"{ShiftApproach.Visibility}|{ShiftPlaceholder.Visibility}|{ShiftDownPill.Visibility}|{_forcedCue}|" +
             GetNativePresentationDiagnostics();
         if (string.Equals(key, _lastHealthKey, StringComparison.Ordinal)
             && now - _lastHealthAt < 5000)
@@ -300,8 +289,8 @@ public partial class ShiftCuePanel : PanelWindow
         HudLog.Health(
             $"[SHIFT-HEALTH] mode={mode} live={State.Live} clickThrough={ClickThrough} " +
             $"wpfVisibility={Visibility} isVisible={IsVisible} " +
-            $"light={ShiftLight.Visibility} opacity={ShiftLight.Opacity.ToString("F2", CultureInfo.InvariantCulture)} " +
-            $"placeholder={ShiftPlaceholder.Visibility} forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
+            $"cue={ShiftApproach.Visibility} opacity={ShiftApproach.Opacity.ToString("F2", CultureInfo.InvariantCulture)} " +
+            $"placeholder={ShiftPlaceholder.Visibility} down={ShiftDownPill.Visibility} forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
             $"gear={packet.Gear} rpm={packet.CurrentEngineRpm.ToString("F0", CultureInfo.InvariantCulture)} " +
             $"accel={packet.Accel} upAdvice={upAdvice} upGate={upGate} " +
             $"downEvaluated={downEvaluated} downAdvice={downAdvice} downGate={downGate} " +
@@ -312,7 +301,7 @@ public partial class ShiftCuePanel : PanelWindow
     {
         string key =
             $"NODATA|{State.Live}|{ClickThrough}|{Visibility}|{IsVisible}|" +
-            $"{ShiftLight.Visibility}|{ShiftPlaceholder.Visibility}|{_forcedCue}|" +
+            $"{ShiftApproach.Visibility}|{ShiftPlaceholder.Visibility}|{ShiftDownPill.Visibility}|{_forcedCue}|" +
             GetNativePresentationDiagnostics();
         long now = Environment.TickCount64;
         if (string.Equals(key, _lastHealthKey, StringComparison.Ordinal)
@@ -326,8 +315,8 @@ public partial class ShiftCuePanel : PanelWindow
         HudLog.Health(
             $"[SHIFT-HEALTH] mode=NODATA live={State.Live} clickThrough={ClickThrough} " +
             $"wpfVisibility={Visibility} isVisible={IsVisible} " +
-            $"light={ShiftLight.Visibility} opacity={ShiftLight.Opacity.ToString("F2", CultureInfo.InvariantCulture)} " +
-            $"placeholder={ShiftPlaceholder.Visibility} forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
+            $"cue={ShiftApproach.Visibility} opacity={ShiftApproach.Opacity.ToString("F2", CultureInfo.InvariantCulture)} " +
+            $"placeholder={ShiftPlaceholder.Visibility} down={ShiftDownPill.Visibility} forcedCue={_forcedCue?.ToString().ToUpperInvariant() ?? "NONE"} " +
             GetNativePresentationDiagnostics());
     }
 
@@ -389,24 +378,20 @@ public partial class ShiftCuePanel : PanelWindow
             // game. Collapsing the Window itself leaves a blank compositor
             // surface when the next cue tries to bring it back.
             Visibility = Visibility.Visible;
-            ShiftLight.Visibility = Visibility.Collapsed;
-            ShiftLight.Opacity = 1;
             ShiftApproach.Visibility = Visibility.Collapsed;
+            ShiftApproach.Opacity = 1;
+            ShiftDownPill.Visibility = Visibility.Collapsed;
+            ShiftDownPill.Opacity = 1;
             ShiftPlaceholder.Visibility = Visibility.Collapsed;
             return;
         }
 
         Visibility = Visibility.Visible;
-        ShiftLight.Visibility = Visibility.Collapsed;
-        ShiftLight.Opacity = 1;
         ShiftApproach.Visibility = Visibility.Collapsed;
+        ShiftApproach.Opacity = 1;
+        ShiftDownPill.Visibility = Visibility.Collapsed;
+        ShiftDownPill.Opacity = 1;
         ShiftPlaceholder.Visibility = Visibility.Visible;
-        PlaceholderArrow.Text = "↕";
-        PlaceholderText.Text = "SHIFT CUE";
-        PlaceholderArrow.Foreground = _mutedBrush;
-        PlaceholderText.Foreground = _mutedBrush;
-        ShiftPlaceholder.Background = _cardBrush;
-        ShiftPlaceholder.BorderBrush = _mutedBrush;
     }
 
     private SolidColorBrush BrushForGroup(UpshiftApproach.LightGroup group) => group switch
