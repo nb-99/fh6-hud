@@ -30,7 +30,7 @@ public static class UpshiftApproach
     public const double WindowStartFraction = 0.8;
 
     /// <summary>Width of the approach window as a fraction of the shift point.</summary>
-    public const double WindowFraction = 0.2;
+    public const double WindowFraction = 1.0 - WindowStartFraction;
 
     /// <summary>Color group of each light in the six-light progression.</summary>
     public enum LightGroup
