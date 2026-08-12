@@ -6,11 +6,16 @@
 
 Shipped in issues #12–#14: six progressive lights (two yellow, two orange, two red) fill left-to-right during the final 20% of the RPM distance to the learned shift point; at the point all six turn red and "▲ UPSHIFT" reveals inside the same component, which then blinks. The engine title shows `SHIFT LEARNING` while a gear is being learned. Redline fallback (no power crossover) runs the same progression to the limiter.
 
+## [ ] Engine/RPM panel axis marker
+
+**Readability:** Currently the power over RPM curve does not have proper axis markers. An at a glance view works, but it is impossible to say e.g. "my car has max power between 5750 and 6250 RPM". A fairly basic grid in the background of the power curve would allow for a much better understanding of the engine's power characteristics and allow for better tuning of gears and shifting decisions.
+
 ## [ ] Configurable Panels
 
 **Hideable:** Panels should be individually hideable/deactivatable, either manually or by certain conditions (e.g. when tire temp has not changed in the last 10 secs e.g. when in the tuning menu, hide the tire temp panel)
 **Resizable:** Panels should be resizable via dragging their edges and their size persisted alongside their position in config.json
 **Persistent Positioning:** Panels should be able to be moved around the screen and their dragged position saved. This would allow users to customize their HUD layout to their liking by dragging, instead of only via the config.json initial positioning.
+**Auto-hide:** Panels should be able to auto-hide when not in use, e.g. when the car is stationary or when the player is in a menu, and reappear when the car is moving or when the player is back in the game. The `raceOn` data does not always match the actual state, e.g. in the tuning menu we can still rev the engine and data is sent out, but the HUD get's in the way of tuning data. Hide panels separately if their relevant data is stale for a certain amount of time.
 
 ## [ ] Update README
 
@@ -19,6 +24,7 @@ Shipped in issues #12–#14: six progressive lights (two yellow, two orange, two
 ## [ ] Tire temps
 
 **Temperature Ranges:** Verify correct tire operating temperature ranges.
+**Tire compound:** Show which tire compound is selected in the HUD.
 **Visibility:** Resolved in issue #4: the state and signed delta are larger and sit above the current temperature.
 
 ## [ ] Makefile
