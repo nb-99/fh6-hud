@@ -51,5 +51,22 @@
                            Margin="9,0,0,0"/>
             </StackPanel>
         </Border>
+
+        <Border x:Name="ShiftApproach"
+                Visibility="Collapsed"
+                Background="{StaticResource CardBrush}"
+                BorderBrush="{StaticResource MutedBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12,7">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Ellipse x:Name="ApproachLight1" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+                <Ellipse x:Name="ApproachLight2" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+                <Ellipse x:Name="ApproachLight3" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+                <Ellipse x:Name="ApproachLight4" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+                <Ellipse x:Name="ApproachLight5" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+                <Ellipse x:Name="ApproachLight6" Width="12" Height="12" VerticalAlignment="Center" Fill="{StaticResource ShiftLightInactiveBrush}"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </fh6:PanelWindow>

@@ -30,6 +30,10 @@
         <SolidColorBrush x:Key="DoneBrush" Color="#50E3A4"/>
         <SolidColorBrush x:Key="ShiftUpFillBrush" Color="#59FF6B6B"/>
         <SolidColorBrush x:Key="ShiftDownFillBrush" Color="#594CB8FF"/>
+        <SolidColorBrush x:Key="ShiftLightInactiveBrush" Color="#3E4D63"/>
+        <SolidColorBrush x:Key="ShiftLightYellowBrush" Color="#FFC857"/>
+        <SolidColorBrush x:Key="ShiftLightOrangeBrush" Color="#FF9500"/>
+        <SolidColorBrush x:Key="ShiftLightRedBrush" Color="#FF5C5C"/>
         <FontFamily x:Key="DigitFont">Consolas</FontFamily>
     </Application.Resources>
 </Application>
