@@ -94,7 +94,7 @@ public partial class ShiftCuePanel : PanelWindow
         // advice mirrors the terminal upshift arbitration — one clear action.
         bool approach = !up && !forceDown
                         && upRpm is { } target
-                        && packet.Accel >= UpshiftThrottleThreshold
+                        && upGate
                         && UpshiftApproach.IsInWindow(packet.CurrentEngineRpm, target);
 
         bool downEvaluated = !up && !approach;
