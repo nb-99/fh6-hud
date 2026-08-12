@@ -26,11 +26,20 @@ public static class UpshiftApproach
     /// <summary>Number of discrete lights in the approach cue.</summary>
     public const int LightCount = 6;
 
-    /// <summary>RPM fraction of the shift point where the approach window opens.</summary>
+    /// <summary>
+    /// RPM fraction of the shift point where the approach window opens. Must
+    /// remain the exact literal: deriving it as <c>1.0 - WindowFraction</c>
+    /// would introduce a double rounding epsilon that shifts the discrete
+    /// light thresholds. Both fractions deliberately stay literals and sum
+    /// to 1.
+    /// </summary>
     public const double WindowStartFraction = 0.8;
 
-    /// <summary>Width of the approach window as a fraction of the shift point.</summary>
-    public const double WindowFraction = 1.0 - WindowStartFraction;
+    /// <summary>
+    /// Width of the approach window as a fraction of the shift point. Exact
+    /// literal for the same reason as <see cref="WindowStartFraction"/>.
+    /// </summary>
+    public const double WindowFraction = 0.2;
 
     /// <summary>Color group of each light in the six-light progression.</summary>
     public enum LightGroup
