@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Fh6Hud.Telemetry;
 
 namespace Fh6Hud;
@@ -36,6 +37,10 @@ public abstract class PanelWindow : Window
     private static HwndSource? _hotkeySource;
 
     private HwndSource? _source;
+    private bool? _lastRenderTraceLive;
+    private bool _presentationRepairQueued;
+    private bool _presentationRepairRunning;
+    private bool _presentationRepairAgain;
 
     protected PanelWindow(HudState state, string panelKey)
     {
@@ -95,13 +100,48 @@ public abstract class PanelWindow : Window
     /// when content changes back to visible while click-through is enabled.
     /// Reconcile the native HWND after rendering without activating it.
     /// </summary>
-    private void EnsureNativePresentation()
+    private void QueueNativePresentationRepair()
+    {
+        if (!NeedsNativePresentationRepair())
+        {
+            return;
+        }
+
+        if (_presentationRepairRunning)
+        {
+            _presentationRepairAgain = true;
+            return;
+        }
+
+        if (_presentationRepairQueued)
+        {
+            return;
+        }
+
+        _presentationRepairQueued = true;
+        try
+        {
+            // Rendering callbacks must not synchronously force WPF layout or
+            // native window changes. Queue the repair so any reentrant render
+            // request can only coalesce behind this operation.
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Render,
+                new Action(RepairNativePresentation));
+        }
+        catch (Exception ex)
+        {
+            _presentationRepairQueued = false;
+            HudLog.Error($"presentation repair queue failed panel={GetType().Name}", ex);
+        }
+    }
+
+    private bool NeedsNativePresentationRepair()
     {
         if (Visibility != Visibility.Visible
             || _source?.Handle is not { } handle
             || handle == IntPtr.Zero)
         {
-            return;
+            return false;
         }
 
         if (IsWindowVisible(handle)
@@ -109,24 +149,72 @@ public abstract class PanelWindow : Window
             && currentRect.Right - currentRect.Left > 2
             && currentRect.Bottom - currentRect.Top > 2)
         {
-            return;
+            return false;
         }
 
         // A mounted click-through panel intentionally has no visual content
         // while idle and may therefore be 2x2. Wait for its content to expand
         // before treating that size as a repair failure.
-        if (Math.Max(ActualWidth, DesiredSize.Width) <= 2
-            || Math.Max(ActualHeight, DesiredSize.Height) <= 2)
+        return Math.Max(ActualWidth, DesiredSize.Width) > 2
+            && Math.Max(ActualHeight, DesiredSize.Height) > 2;
+    }
+
+    private void RepairNativePresentation()
+    {
+        _presentationRepairQueued = false;
+        if (_presentationRepairRunning)
         {
+            _presentationRepairAgain = true;
             return;
         }
 
+        _presentationRepairRunning = true;
+        try
+        {
+            if (NeedsNativePresentationRepair())
+            {
+                RepairNativePresentationCore();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Presentation repair is best effort. An HWND/layout failure must
+            // be visible in the log without taking down the render loop.
+            HudLog.Error($"presentation repair failed panel={GetType().Name}", ex);
+        }
+        finally
+        {
+            _presentationRepairRunning = false;
+            if (_presentationRepairAgain)
+            {
+                _presentationRepairAgain = false;
+                QueueNativePresentationRepair();
+            }
+        }
+    }
+
+    private void RepairNativePresentationCore()
+    {
+        IntPtr handle = _source!.Handle;
+        long repairStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+        LogPresentationTrace("begin", repairStarted);
+
+        LogPresentationTrace("UpdateLayout begin", repairStarted);
         UpdateLayout();
+        LogPresentationTrace("UpdateLayout end", repairStarted);
+
+        LogPresentationTrace("ApplyExtendedStyle begin", repairStarted);
         ApplyExtendedStyle();
+        LogPresentationTrace("ApplyExtendedStyle end", repairStarted);
 
         int width = Math.Max(1, (int)Math.Ceiling(Math.Max(ActualWidth, DesiredSize.Width)));
         int height = Math.Max(1, (int)Math.Ceiling(Math.Max(ActualHeight, DesiredSize.Height)));
+
+        LogPresentationTrace("ShowWindow begin", repairStarted);
         ShowWindow(handle, SwShownNoActivate);
+        LogPresentationTrace("ShowWindow end", repairStarted);
+
+        LogPresentationTrace("SetWindowPos begin", repairStarted);
         SetWindowPos(
             handle,
             new IntPtr(-1),
@@ -135,9 +223,21 @@ public abstract class PanelWindow : Window
             width,
             height,
             SwpNoMove | SwpNoActivate | SwpFrameChanged);
+        LogPresentationTrace("SetWindowPos end", repairStarted);
         HudLog.Health(
             $"[PRESENTATION-REPAIR] panel={GetType().Name} size={width}x{height} " +
-            GetNativePresentationDiagnostics());
+             GetNativePresentationDiagnostics());
+    }
+
+    private void LogPresentationTrace(string stage, long started)
+    {
+        double elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - started)
+            * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        HudLog.Health(
+            $"[PRESENTATION-TRACE] panel={GetType().Name} stage={stage} " +
+            $"elapsed={elapsedMs:0.0}ms visibility={Visibility} " +
+            $"actual={ActualWidth:0.0}x{ActualHeight:0.0} " +
+            $"desired={DesiredSize.Width:0.0}x{DesiredSize.Height:0.0}");
     }
 
     /// <summary>Global toggle: while true, every panel passes input to the game.</summary>
@@ -152,25 +252,65 @@ public abstract class PanelWindow : Window
     /// <summary>Per-frame entry point called from the App render loop, after HudState.Tick.</summary>
     public void RenderTick()
     {
-        if (!State.Live)
+        bool live = State.Live;
+        bool traceTransition = _lastRenderTraceLive != live;
+        if (traceTransition)
         {
-            if (HideWhenNoData && Visibility != Visibility.Collapsed)
+            _lastRenderTraceLive = live;
+            HudLog.Health(
+                $"[RENDER-TRACE] begin panel={GetType().Name} live={live} " +
+                $"visibility={Visibility} clickThrough={ClickThrough}");
+        }
+
+        bool completed = false;
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
+            if (!live)
             {
-                Visibility = Visibility.Collapsed;
+                if (HideWhenNoData && Visibility != Visibility.Collapsed)
+                {
+                    Visibility = Visibility.Collapsed;
+                }
+
+                RenderNoData();
+                if (traceTransition)
+                {
+                    HudLog.Health($"[RENDER-TRACE] body-complete panel={GetType().Name} stage=RenderNoData");
+                    HudLog.Health($"[RENDER-TRACE] presentation-queued panel={GetType().Name}");
+                }
+
+                QueueNativePresentationRepair();
+                completed = true;
+                return;
             }
 
-            RenderNoData();
-            EnsureNativePresentation();
-            return;
-        }
+            if (Visibility != Visibility.Visible)
+            {
+                Visibility = Visibility.Visible;
+            }
 
-        if (Visibility != Visibility.Visible)
+            Render(State.Latest!);
+            if (traceTransition)
+            {
+                HudLog.Health($"[RENDER-TRACE] body-complete panel={GetType().Name} stage=Render");
+                HudLog.Health($"[RENDER-TRACE] presentation-queued panel={GetType().Name}");
+            }
+
+            QueueNativePresentationRepair();
+            completed = true;
+        }
+        finally
         {
-            Visibility = Visibility.Visible;
+            if (traceTransition)
+            {
+                double elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - started)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                HudLog.Health(
+                    $"[RENDER-TRACE] end panel={GetType().Name} live={live} " +
+                    $"completed={completed} elapsed={elapsedMs:0.0}ms visibility={Visibility}");
+            }
         }
-
-        Render(State.Latest!);
-        EnsureNativePresentation();
     }
 
     protected abstract void Render(Fh6Packet packet);
