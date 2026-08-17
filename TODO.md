@@ -10,6 +10,10 @@ Shipped in issues #12–#14: six progressive lights (two yellow, two orange, two
 
 **Readability:** Currently the power over RPM curve does not have proper axis markers. An at a glance view works, but it is impossible to say e.g. "my car has max power between 5750 and 6250 RPM". A fairly basic grid in the background of the power curve would allow for a much better understanding of the engine's power characteristics and allow for better tuning of gears and shifting decisions.
 
+## [ ] Fix HUD crashes
+
+**Crashes:** The HUD sometimes crashes. Parts of the overlay remain visible but are stuck, not clickable and do not show new data. From a gut feeling, this mostly occurs after entering a menu or loading screen and then coming back to the game the HUD crashed.
+
 ## [ ] Configurable Panels
 
 **Hideable:** Panels should be individually hideable/deactivatable, either manually or by certain conditions (e.g. when tire temp has not changed in the last 10 secs e.g. when in the tuning menu, hide the tire temp panel)
