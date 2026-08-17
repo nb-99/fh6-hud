@@ -37,6 +37,18 @@ public class HudLogTests : IDisposable
     }
 
     [Fact]
+    public void Disabled_WritesErrorRecords()
+    {
+        string path = Path.Combine(_dir, "hud.log");
+        Directory.CreateDirectory(_dir);
+        HudLog.Initialize(path, enabled: false);
+        HudLog.Error("crash signal", new InvalidOperationException("nope"));
+
+        string[] lines = File.ReadAllLines(path);
+        Assert.Contains(lines, l => l.Contains("[ERROR] crash signal: System.InvalidOperationException: nope"));
+    }
+
+    [Fact]
     public void Enabled_WritesTimestampedLines()
     {
         string path = Path.Combine(_dir, "hud.log");
