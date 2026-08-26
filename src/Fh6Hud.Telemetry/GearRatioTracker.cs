@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Fh6Hud.Telemetry;
 
 /// <summary>
@@ -33,6 +35,7 @@ public sealed class GearRatioTracker
     private readonly Dictionary<int, GearStats> _byGear = new();
     private int _version;
 
+    [StructLayout(LayoutKind.Auto)]
     private struct GearStats
     {
         public double Sum;

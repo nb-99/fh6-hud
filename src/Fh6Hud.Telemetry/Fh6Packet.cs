@@ -1,9 +1,11 @@
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Fh6Hud.Telemetry;
 
-/// <summary>Parsed FH6 "Data Out" telemetry packet (324 bytes, little-endian).</summary>
-public sealed class Fh6Packet
+[SuppressMessage("Microsoft.Naming", "CA1710",
+    Justification = "The packet is a telemetry DTO that also serves as the event payload; renaming to EventArgs would misstate its primary role.")]
+public sealed class Fh6Packet : EventArgs
 {
     public const int PacketSize = 324;
 
@@ -109,7 +111,8 @@ public sealed class Fh6Packet
 
     public static float CelsiusToFahrenheit(float celsius) => celsius * (9f / 5f) + 32f;
 
-    /// <summary>Parses a raw 324-byte FH6 datagram. Returns null if the buffer length is invalid.</summary>
+    [SuppressMessage("Meziantou.Analyzer", "MA0051",
+        Justification = "Declarative field-by-field decode of the fixed 324-byte Data Out layout; splitting would obscure the offset mapping.")]
     public static Fh6Packet? Parse(ReadOnlySpan<byte> data)
     {
         if (data.Length != PacketSize)

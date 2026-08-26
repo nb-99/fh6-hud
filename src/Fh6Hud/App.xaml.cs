@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using Fh6Hud.Telemetry;
@@ -13,7 +13,7 @@ namespace Fh6Hud;
 /// (test instances can then run beside the production app without sharing
 /// its port); <c>--debug</c> enables hud.log for a single run.
 /// </summary>
-public partial class App : Application
+public partial class App : Application, IDisposable
 {
     private const int WatchdogIntervalMs = 2000;
     private const int WatchdogReportEveryTicks = 5; // 10 s
@@ -187,7 +187,7 @@ public partial class App : Application
                 e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             HudLog.Error("unhandled app exception",
-                e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()));
+                e.ExceptionObject as Exception ?? new InvalidOperationException(e.ExceptionObject?.ToString()));
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             HudLog.Error("unobserved task exception", e.Exception);
@@ -195,12 +195,18 @@ public partial class App : Application
         };
     }
 
+    /// <summary>Releases the telemetry state and the watchdog timer.</summary>
+    public void Dispose()
+    {
+        _watchdog?.Dispose();
+        _state?.Dispose();
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         HudLog.Info("shutdown");
         CompositionTarget.Rendering -= OnRendering;
-        _watchdog?.Dispose();
-        _state?.Dispose();
+        Dispose();
         base.OnExit(e);
     }
 }

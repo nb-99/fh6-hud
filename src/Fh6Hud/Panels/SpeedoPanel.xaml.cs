@@ -1,3 +1,4 @@
+using System.Globalization;
 using Fh6Hud.Telemetry;
 
 namespace Fh6Hud.Panels;
@@ -25,6 +26,6 @@ public partial class SpeedoPanel : PanelWindow
     {
         0 => "R",
         11 => "N",
-        _ => gear.ToString(),
+        _ => gear.ToString(CultureInfo.InvariantCulture),
     };
 }

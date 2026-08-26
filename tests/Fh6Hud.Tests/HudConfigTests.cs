@@ -11,6 +11,7 @@ public class HudConfigTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try
         {
             Directory.Delete(_dir, recursive: true);
@@ -105,8 +106,8 @@ public class HudConfigTests : IDisposable
         config.Save(path);
 
         var json = File.ReadAllText(path);
-        Assert.DoesNotContain("SourcePath", json);
-        Assert.DoesNotContain("LoadFailed", json);
+        Assert.DoesNotContain("SourcePath", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("LoadFailed", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -170,9 +171,11 @@ public class HudConfigTests : IDisposable
         Assert.Equal(expected, HudConfig.ParsePortOverride(args));
     }
 
+    private static readonly string[] InvalidThenValidPortArgs = { "--port", "abc", "--port", "45001" };
+
     [Fact]
     public void ParsePortOverride_FirstValidPortWins_OverInvalidEarlierOne()
     {
-        Assert.Equal(45001, HudConfig.ParsePortOverride(new[] { "--port", "abc", "--port", "45001" }));
+        Assert.Equal(45001, HudConfig.ParsePortOverride(InvalidThenValidPortArgs));
     }
 }

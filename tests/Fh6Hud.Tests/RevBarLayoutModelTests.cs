@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Fh6Hud.Telemetry;
 
 namespace Fh6Hud.Tests;
@@ -29,6 +30,7 @@ public class RevBarLayoutModelTests
     /// <summary>200 ms frames over ~40 s of driving: ramp to the limiter, shift, repeat.</summary>
     private static readonly double[] Profile = BuildProfile();
 
+    [StructLayout(LayoutKind.Auto)]
     private readonly record struct Frame(double FillEnd, double ZoneStart, double ZoneEnd);
 
     private static IEnumerable<Frame> Frames(bool zoneOnTop, bool clampFill)

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using Fh6Hud.Telemetry;
@@ -65,9 +66,9 @@ public static class Program
         {
             switch (args[i])
             {
-                case "--port" when i + 1 < args.Length: port = int.Parse(args[++i]); break;
-                case "--rate" when i + 1 < args.Length: rate = double.Parse(args[++i]); break;
-                case "--seconds" when i + 1 < args.Length: seconds = double.Parse(args[++i]); break;
+                case "--port" when i + 1 < args.Length: port = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--rate" when i + 1 < args.Length: rate = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--seconds" when i + 1 < args.Length: seconds = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--scenario" when i + 1 < args.Length: scenario = args[++i]; break;
                 case "--help":
                     Console.WriteLine("Usage: Fh6Hud.Simulator [--port 45000] [--rate 60] [--seconds 30] [--scenario cruise|launch]");
@@ -89,7 +90,7 @@ public static class Program
         {
             if (stopwatch.Elapsed < nextTick)
             {
-                await Task.Delay(1);
+                await Task.Delay(1).ConfigureAwait(false);
                 continue;
             }
 
