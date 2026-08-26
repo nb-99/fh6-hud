@@ -198,6 +198,7 @@ public partial class App : Application, IDisposable
     /// <summary>Releases the telemetry state and the watchdog timer.</summary>
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         _watchdog?.Dispose();
         _state?.Dispose();
     }
