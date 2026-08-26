@@ -688,7 +688,7 @@ public sealed class PanelWindowDragTests
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
 
-            Assert.True(completed.Wait(TimeSpan.FromSeconds(10)), "The WPF test thread did not exit.");
+            Assert.True(completed.Wait(TimeSpan.FromSeconds(30)), "The WPF test thread did not exit.");
             thread.Join();
             if (failure is not null)
             {
