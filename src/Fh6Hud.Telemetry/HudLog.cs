@@ -20,7 +20,7 @@ public static class HudLog
         Error,
     }
 
-    private static readonly object Sync = new();
+    private static readonly Lock Sync = new();
 
     /// <summary>True once <see cref="Initialize"/> was called with enabled=true.</summary>
     public static bool Enabled { get; private set; }
