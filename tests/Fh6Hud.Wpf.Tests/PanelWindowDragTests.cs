@@ -652,7 +652,7 @@ public sealed class PanelWindowDragTests
             var cue = (Border)shiftCue.FindName("ShiftApproach")!;
             var terminal = (StackPanel)shiftCue.FindName("ShiftApproachTerminal")!;
             var text = (TextBlock)shiftCue.FindName("ShiftUpText")!;
-            if (text.Text == "UPSHIFT"
+            if (string.Equals(text.Text, "UPSHIFT", StringComparison.Ordinal)
                 && terminal.Visibility == Visibility.Visible
                 && cue.Visibility == Visibility.Visible
                 && cue.Opacity == 1)
