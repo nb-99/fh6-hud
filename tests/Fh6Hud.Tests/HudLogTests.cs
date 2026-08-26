@@ -8,6 +8,7 @@ public class HudLogTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         HudLog.Initialize("", enabled: false);
         if (Directory.Exists(_dir))
         {
@@ -33,7 +34,7 @@ public class HudLogTests : IDisposable
         HudLog.Health("[HEALTH] still alive");
 
         string[] lines = File.ReadAllLines(path);
-        Assert.Contains(lines, l => l.Contains("[HEALTH] [HEALTH] still alive"));
+        Assert.Contains(lines, l => l.Contains("[HEALTH] [HEALTH] still alive", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -45,7 +46,7 @@ public class HudLogTests : IDisposable
         HudLog.Error("crash signal", new InvalidOperationException("nope"));
 
         string[] lines = File.ReadAllLines(path);
-        Assert.Contains(lines, l => l.Contains("[ERROR] crash signal: System.InvalidOperationException: nope"));
+        Assert.Contains(lines, l => l.Contains("[ERROR] crash signal: System.InvalidOperationException: nope", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -59,9 +60,9 @@ public class HudLogTests : IDisposable
         HudLog.Error("boom", new InvalidOperationException("nope"));
 
         string[] lines = File.ReadAllLines(path);
-        Assert.Contains(lines, l => l.Contains("[INFO] hello"));
-        Assert.Contains(lines, l => l.Contains("[DEBUG] world"));
-        Assert.Contains(lines, l => l.Contains("[ERROR] boom: System.InvalidOperationException: nope"));
+        Assert.Contains(lines, l => l.Contains("[INFO] hello", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Contains("[DEBUG] world", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Contains("[ERROR] boom: System.InvalidOperationException: nope", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -75,7 +76,7 @@ public class HudLogTests : IDisposable
         HudLog.Info("two");
 
         string[] lines = File.ReadAllLines(path);
-        Assert.Contains(lines, l => l.Contains("one"));
-        Assert.DoesNotContain(lines, l => l.Contains("two"));
+        Assert.Contains(lines, l => l.Contains("one", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("two", StringComparison.Ordinal));
     }
 }

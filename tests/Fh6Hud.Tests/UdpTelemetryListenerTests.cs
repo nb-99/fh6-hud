@@ -8,7 +8,11 @@ public class UdpTelemetryListenerTests : IDisposable
 {
     private readonly UdpTelemetryListener _listener = new(0);
 
-    public void Dispose() => _listener.Dispose();
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        _listener.Dispose();
+    }
 
     [Fact]
     public async Task ValidPacket_RaisesEventAndIncrementsCounter()

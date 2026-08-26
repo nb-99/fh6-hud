@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -811,6 +812,7 @@ public sealed class PanelWindowDragTests
         }
     }
 
+    [StructLayout(LayoutKind.Auto)]
     private readonly record struct DragResult(
         double InitialLeft,
         double FinalLeft,
@@ -857,6 +859,7 @@ public sealed class PanelWindowDragTests
         string ForcedDownCueArrow,
         Visibility ForcedDownVisibility);
 
+    [StructLayout(LayoutKind.Auto)]
     private readonly record struct ShiftCueModeResult(
         Visibility PlaceholderWindowVisibility,
         Visibility PlaceholderVisibility,
@@ -893,6 +896,7 @@ public sealed class PanelWindowDragTests
         Visibility NoDataDownVisibility,
         Visibility ReentryApproachVisibility);
 
+    [StructLayout(LayoutKind.Auto)]
     private readonly record struct LearningAndPriorityResult(
         Visibility LearningDownVisibility,
         Visibility LearningCueVisibility,

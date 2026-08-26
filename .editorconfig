@@ -6,6 +6,9 @@ indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.cs]
-csharp_new_line_before_open_brace = all
-dotnet_diagnostic.IDE0055.severity = error
+# xUnit test names use underscores by convention; test methods are long by
+# design (arrange/act/assert + WPF setup). CA1707 and MA0051 add no signal
+# here, so they are suppressed for test projects only.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.MA0051.severity = none

@@ -321,7 +321,7 @@ public abstract class PanelWindow : Window
 
     protected static void SetText(TextBlock block, string text)
     {
-        if (block.Text != text)
+        if (!string.Equals(block.Text, text, StringComparison.Ordinal))
         {
             block.Text = text;
         }

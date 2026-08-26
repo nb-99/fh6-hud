@@ -97,7 +97,7 @@ public sealed class HudState : IDisposable
             ? "FH6 // IN MENU"
             : "FH6 // NO DATA";
         bool liveChanged = live != Live;
-        bool noDataMessageChanged = !live && noDataMessage != NoDataMessage;
+        bool noDataMessageChanged = !live && !string.Equals(noDataMessage, NoDataMessage, StringComparison.Ordinal);
 
         if (liveChanged || noDataMessageChanged)
         {

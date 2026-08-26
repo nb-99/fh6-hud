@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -32,14 +34,14 @@ public sealed class HudConfig
 
     public float TireOptMaxC { get; set; } = 90f;
 
-    /// <summary>
-    /// Per-panel positions (see <see cref="PanelPlacement"/>), keyed by
-    /// <see cref="PanelKeys"/>. Updated and saved when a panel is dragged.
-    /// </summary>
+    [SuppressMessage("Meziantou.Analyzer", "MA0016",
+        Justification = "Dictionary is the JSON-serialized config surface; callers use the indexer and key set from PanelKeys, and the concrete type keeps STJ behavior explicit.")]
     public Dictionary<string, PanelPlacement> Panels { get; set; } = CreateDefaultPanels();
 
     /// <summary>First-run layout, as fractions of the work area.</summary>
-    public static Dictionary<string, PanelPlacement> CreateDefaultPanels() => new()
+    [SuppressMessage("Meziantou.Analyzer", "MA0016",
+        Justification = "Returned as the concrete Dictionary so the serializer and callers agree on one type; the abstraction adds no value here.")]
+    public static Dictionary<string, PanelPlacement> CreateDefaultPanels() => new(StringComparer.Ordinal)
     {
         // Tire temps bottom-left, 20% in from the left and bottom edges.
         [PanelKeys.Tires] = new() { X = 0.20, Y = 0.80, Anchor = PanelAnchor.BottomLeft },
@@ -123,7 +125,9 @@ public sealed class HudConfig
                 value = args[++i];
             }
 
-            if (value is not null && int.TryParse(value, out int port) && port is > 0 and <= 65535)
+            if (value is not null
+                && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int port)
+                && port is > 0 and <= 65535)
             {
                 return port;
             }
