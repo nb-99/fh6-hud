@@ -156,6 +156,93 @@ public class HudConfigTests : IDisposable
         Assert.Equal(PanelAnchor.BottomRight, speedo.Anchor);
     }
 
+    [Fact]
+    public void Load_MissingFile_DefaultsKeepPanelsVisibleAndUnscaled()
+    {
+        var config = HudConfig.Load(PathFor("defaults-presentation.json"));
+
+        Assert.Equal(10.0, config.IdleHideSeconds);
+        foreach (var placement in config.Panels.Values)
+        {
+            Assert.Equal(1.0, placement.Scale);
+            Assert.False(placement.Hidden);
+            Assert.False(placement.AutoHide);
+        }
+    }
+
+    [Fact]
+    public void Load_LegacyPlacementWithoutNewFields_UsesDefaults()
+    {
+        var path = PathFor("legacy-placement.json");
+        File.WriteAllText(path, """{"Panels": {"Speedo": {"X": 0.9, "Y": 0.1, "Anchor": "TopRight"}}}""");
+
+        var speedo = HudConfig.Load(path).Panels[PanelKeys.Speedo];
+
+        Assert.Equal(0.9, speedo.X);
+        Assert.Equal(1.0, speedo.Scale);
+        Assert.False(speedo.Hidden);
+        Assert.False(speedo.AutoHide);
+    }
+
+    [Fact]
+    public void Save_RoundTripsScaleVisibilityAndIdleThreshold()
+    {
+        var path = PathFor("presentation-roundtrip.json");
+        var config = HudConfig.Load(path);
+        config.IdleHideSeconds = 4.5;
+        config.Panels[PanelKeys.Tires].Scale = 1.75;
+        config.Panels[PanelKeys.Tires].Hidden = true;
+        config.Panels[PanelKeys.Engine].AutoHide = true;
+
+        config.Save(path);
+
+        var reloaded = HudConfig.Load(path);
+        Assert.Equal(4.5, reloaded.IdleHideSeconds);
+        Assert.Equal(1.75, reloaded.Panels[PanelKeys.Tires].Scale);
+        Assert.True(reloaded.Panels[PanelKeys.Tires].Hidden);
+        Assert.True(reloaded.Panels[PanelKeys.Engine].AutoHide);
+        Assert.False(reloaded.Panels[PanelKeys.Speedo].Hidden);
+    }
+
+    [Fact]
+    public void Save_RoundTripsPerPanelIdleHideSeconds()
+    {
+        var path = PathFor("per-panel-idle.json");
+        var config = HudConfig.Load(path);
+        config.Panels[PanelKeys.Engine].IdleHideSeconds = 30.0;
+
+        config.Save(path);
+
+        var reloaded = HudConfig.Load(path);
+        Assert.Equal(30.0, reloaded.Panels[PanelKeys.Engine].IdleHideSeconds);
+        Assert.Equal(2.0, reloaded.Panels[PanelKeys.Tires].IdleHideSeconds);
+        Assert.Null(reloaded.Panels[PanelKeys.Speedo].IdleHideSeconds);
+    }
+
+    [Theory]
+    [InlineData(null, 10.0, 10.0)]
+    [InlineData(2.0, 10.0, 2.0)]
+    [InlineData(0.0, 10.0, 0.0)]
+    [InlineData(-1.0, 10.0, 10.0)]
+    [InlineData(double.NaN, 10.0, 10.0)]
+    public void EffectiveIdleHideSeconds_UsesOverrideElseGlobal(double? perPanel, double global, double expected)
+    {
+        var placement = new PanelPlacement { IdleHideSeconds = perPanel };
+
+        Assert.Equal(expected, placement.EffectiveIdleHideSeconds(global));
+    }
+
+    [Theory]
+    [InlineData(1.0, 1.0)]
+    [InlineData(0.1, PanelPlacement.MinScale)]
+    [InlineData(9.0, PanelPlacement.MaxScale)]
+    [InlineData(double.NaN, 1.0)]
+    [InlineData(double.PositiveInfinity, 1.0)]
+    public void ClampScale_KeepsScaleInSupportedRange(double input, double expected)
+    {
+        Assert.Equal(expected, PanelPlacement.ClampScale(input));
+    }
+
     [Theory]
     [InlineData(new[] { "--port", "45001" }, 45001)]
     [InlineData(new[] { "--port=45001" }, 45001)]

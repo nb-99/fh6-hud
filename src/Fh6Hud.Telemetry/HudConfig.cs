@@ -34,6 +34,12 @@ public sealed class HudConfig
 
     public float TireOptMaxC { get; set; } = 90f;
 
+    /// <summary>
+    /// Seconds without a change in a panel's own telemetry before a panel with
+    /// <see cref="PanelPlacement.AutoHide"/> enabled hides itself.
+    /// </summary>
+    public double IdleHideSeconds { get; set; } = 10.0;
+
     [SuppressMessage("Meziantou.Analyzer", "MA0016",
         Justification = "Dictionary is the JSON-serialized config surface; callers use the indexer and key set from PanelKeys, and the concrete type keeps STJ behavior explicit.")]
     public Dictionary<string, PanelPlacement> Panels { get; set; } = CreateDefaultPanels();
@@ -44,7 +50,7 @@ public sealed class HudConfig
     public static Dictionary<string, PanelPlacement> CreateDefaultPanels() => new(StringComparer.Ordinal)
     {
         // Tire temps bottom-left, 20% in from the left and bottom edges.
-        [PanelKeys.Tires] = new() { X = 0.20, Y = 0.80, Anchor = PanelAnchor.BottomLeft },
+        [PanelKeys.Tires] = new() { X = 0.20, Y = 0.80, Anchor = PanelAnchor.BottomLeft, IdleHideSeconds = 2.0 },
         // Engine/RPM bottom-right, right edge at 80% of the screen width.
         [PanelKeys.Engine] = new() { X = 0.80, Y = 0.80, Anchor = PanelAnchor.BottomRight },
         // Interval timers on the right edge at 25% of the screen height...

@@ -26,6 +26,13 @@ public partial class IntervalPanel : PanelWindow
         _doneBrush = (SolidColorBrush)FindResource("DoneBrush");
     }
 
+    protected override bool SupportsAutoHide => true;
+
+    protected override float ActivityTolerance => 0.5f;
+
+    protected override PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) =>
+        new(packet.SpeedKmh);
+
     protected override void Render(Fh6Packet packet)
     {
         SpeedBarFill.Width = SpeedBarTrack.ActualWidth * Math.Clamp(packet.SpeedKmh / SpeedBarMaxKmh, 0f, 1f);

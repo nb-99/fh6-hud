@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Fh6Hud;
 using Fh6Hud.Panels;
 using Fh6Hud.Telemetry;
@@ -134,6 +135,23 @@ public sealed class PanelWindowDragTests
             Assert.Equal("SHIFT --", result.EngineShiftHint.TopGearText);
             Assert.Equal("SHIFT --", result.EngineShiftHint.NeutralText);
             Assert.Equal("SHIFT --", result.EngineShiftHint.ReverseText);
+
+            var presentation = result.Presentation;
+            Assert.Equal(Visibility.Visible, presentation.ShownAtStart);
+            Assert.Equal(Visibility.Collapsed, presentation.ManualHidden);
+            Assert.Equal(Visibility.Visible, presentation.ManualShown);
+
+            // Idle auto-hide: 10 s without a change beyond the 25 RPM tolerance.
+            Assert.Equal(Visibility.Visible, presentation.BeforeIdleThreshold);
+            Assert.Equal(Visibility.Collapsed, presentation.AtIdleThreshold);
+            Assert.Equal(Visibility.Collapsed, presentation.AfterJitter);
+            Assert.Equal(Visibility.Visible, presentation.AfterRev);
+
+            // The status panel must stay reachable even when hidden in config.
+            Assert.Equal(Visibility.Visible, presentation.StatusHiddenStillVisible);
+
+            Assert.InRange(presentation.ScaledRatio, 1.9, 2.1);
+            Assert.InRange(presentation.ClampedRatio, 2.9, 3.1);
         }
         finally
         {
@@ -148,19 +166,123 @@ public sealed class PanelWindowDragTests
         }
     }
 
+    private static PresentationResult RunPresentationChecks(string configPath)
+    {
+        var state = new HudState();
+        state.Initialize(portOverride: 0, configPath: configPath);
+        EnsureClickThroughOff();
+
+        var placement = state.Config.Panels[PanelKeys.Engine];
+        double now = 0;
+        var panel = new ActivityPanel(state) { Clock = () => now };
+        panel.Show();
+        panel.UpdateLayout();
+
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4000f, accel: 0));
+        panel.RenderTick();
+        Visibility shownAtStart = panel.Visibility;
+
+        placement.Hidden = true;
+        panel.RenderTick();
+        Visibility manualHidden = panel.Visibility;
+        placement.Hidden = false;
+        panel.RenderTick();
+        Visibility manualShown = panel.Visibility;
+
+        placement.AutoHide = true;
+        now = 9;
+        panel.RenderTick();
+        Visibility beforeIdleThreshold = panel.Visibility;
+
+        now = 10;
+        panel.RenderTick();
+        Visibility atIdleThreshold = panel.Visibility;
+
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4010f, accel: 0));
+        now = 11;
+        panel.RenderTick();
+        Visibility afterJitter = panel.Visibility;
+
+        SetLiveState(state, CreatePacket(gear: 1, rpm: 4800f, accel: 0));
+        now = 11.5;
+        panel.RenderTick();
+        Visibility afterRev = panel.Visibility;
+
+        state.Config.Panels[PanelKeys.Status].Hidden = true;
+        var status = new StatusPanel(state);
+        status.Show();
+        status.UpdateLayout();
+        status.RenderTick();
+        Visibility statusHiddenStillVisible = status.Visibility;
+        status.Close();
+
+        placement.AutoHide = false;
+        placement.Hidden = false;
+        placement.Scale = 1.0;
+        var baseline = new ActivityPanel(state);
+        baseline.Show();
+        SettleWindow(baseline);
+        double baseWidth = baseline.ActualWidth;
+        baseline.Close();
+
+        placement.Scale = 2.0;
+        var doubled = new ActivityPanel(state);
+        doubled.Show();
+        SettleWindow(doubled);
+        double scaledRatio = doubled.ActualWidth / baseWidth;
+        doubled.Close();
+
+        placement.Scale = 99.0;
+        var clamped = new ActivityPanel(state);
+        clamped.Show();
+        SettleWindow(clamped);
+        double clampedRatio = clamped.ActualWidth / baseWidth;
+        clamped.Close();
+
+        panel.Close();
+        state.Dispose();
+        return new PresentationResult(
+            shownAtStart,
+            manualHidden,
+            manualShown,
+            beforeIdleThreshold,
+            atIdleThreshold,
+            afterJitter,
+            afterRev,
+            statusHiddenStillVisible,
+            scaledRatio,
+            clampedRatio);
+    }
+
+    /// <summary>
+    /// Lays a freshly shown window out and runs its Loaded callbacks, so
+    /// ActualWidth and anchor-based placement reflect real content size.
+    /// </summary>
+    private static void SettleWindow(Window window)
+    {
+        window.UpdateLayout();
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        window.UpdateLayout();
+    }
+
     private static WpfResult RunAll(string configPath)
     {
         var app = new App();
         app.InitializeComponent();
         try
         {
+            // Runs first: windows created after the other checks in this pass are
+            // never presented here (IsVisible/PresentationSource stay null), so
+            // their ActualWidth cannot be measured.
+            var presentation = RunPresentationChecks(configPath);
             return new WpfResult(
                 RaiseMouseDrag(configPath),
                 RenderShiftCue(),
                 RenderApproachCue(),
                 RenderShiftCueModes(),
                 RenderLearningAndPriority(),
-                RenderEngineShiftHint());
+                RenderEngineShiftHint(),
+                presentation);
         }
         finally
         {
@@ -784,6 +906,36 @@ public sealed class PanelWindowDragTests
             .Build())!;
     }
 
+    /// <summary>A panel that opts into idle auto-hide on engine RPM, with a test clock.</summary>
+    private sealed class ActivityPanel : PanelWindow
+    {
+        public ActivityPanel(HudState state)
+            : base(state, PanelKeys.Engine)
+        {
+            Content = new Border
+            {
+                Width = 240,
+                Height = 80,
+                Background = System.Windows.Media.Brushes.Transparent,
+            };
+        }
+
+        public Func<double> Clock { get; set; } = () => 0;
+
+        protected override bool SupportsAutoHide => true;
+
+        protected override float ActivityTolerance => 25f;
+
+        protected override double NowSeconds => Clock();
+
+        protected override PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) =>
+            new(packet.CurrentEngineRpm);
+
+        protected override void Render(Fh6Packet packet)
+        {
+        }
+    }
+
     private sealed class TestPanel : PanelWindow
     {
         public TestPanel(HudState state)
@@ -800,6 +952,10 @@ public sealed class PanelWindowDragTests
         public double DragDeltaX { get; set; }
 
         public double DragDeltaY { get; set; }
+
+        // The synthetic mouse event reports the pointer at (0,0), which is inside
+        // the resize grip; disable the grip so the move path is what gets tested.
+        protected override bool CanResize => false;
 
         protected override void MoveWindowForDrag()
         {
@@ -825,7 +981,8 @@ public sealed class PanelWindowDragTests
         ApproachCueResult Approach,
         ShiftCueModeResult Modes,
         LearningAndPriorityResult LearningAndPriority,
-        EngineShiftHintResult EngineShiftHint);
+        EngineShiftHintResult EngineShiftHint,
+        PresentationResult Presentation);
 
     private readonly record struct ShiftCueResult(
         string UpCueText,
@@ -905,6 +1062,19 @@ public sealed class PanelWindowDragTests
         Visibility GatedExitVisibility,
         Visibility GateReentryVisibility,
         int GateReentryLights);
+
+    [StructLayout(LayoutKind.Auto)]
+    private readonly record struct PresentationResult(
+        Visibility ShownAtStart,
+        Visibility ManualHidden,
+        Visibility ManualShown,
+        Visibility BeforeIdleThreshold,
+        Visibility AtIdleThreshold,
+        Visibility AfterJitter,
+        Visibility AfterRev,
+        Visibility StatusHiddenStillVisible,
+        double ScaledRatio,
+        double ClampedRatio);
 
     private readonly record struct EngineShiftHintResult(
         string LearnedText,

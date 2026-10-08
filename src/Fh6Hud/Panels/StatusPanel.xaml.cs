@@ -29,6 +29,8 @@ public partial class StatusPanel : PanelWindow
 
     protected override bool HideWhenNoData => false;
 
+    protected override bool CanHide => false;
+
     protected override void Render(Fh6Packet packet) => UpdateChrome();
 
     protected override void RenderNoData() => UpdateChrome();

@@ -31,21 +31,47 @@ public abstract class PanelWindow : Window
     private const int HotkeyId = 1;
     private const int ModControlAlt = 0x2 | 0x1;
 
+    /// <summary>
+    /// Panels offered in the right-click Panels and Auto-hide menus. The status
+    /// panel is deliberately absent: it is the only panel that cannot be hidden.
+    /// </summary>
+    private static readonly (string Key, string Label)[] HideablePanels =
+    {
+        (PanelKeys.Tires, "Tire temps"),
+        (PanelKeys.Engine, "Engine / RPM"),
+        (PanelKeys.ShiftCue, "Shift cue"),
+        (PanelKeys.Intervals, "Intervals"),
+        (PanelKeys.Speedo, "Speedometer"),
+    };
+
     private static readonly List<PanelWindow> All = new();
     private static bool _clickThrough;
     private static bool _hotkeyAttempted;
     private static HwndSource? _hotkeySource;
+
+    /// <summary>Width of the edge band (DIP) that starts a resize drag.</summary>
+    private const double ResizeGripDip = 6;
 
     private HwndSource? _source;
     private bool? _lastRenderTraceLive;
     private bool _presentationRepairQueued;
     private bool _presentationRepairRunning;
     private bool _presentationRepairAgain;
+    private bool _hiddenLastFrame;
+
+    private readonly ScaleTransform _scale;
+    private PanelActivityTracker? _activity;
+    private ResizeEdge? _resizeEdge;
+    private Point _resizePointerStart;
+    private ResizeStart _resizeStart;
 
     protected PanelWindow(HudState state, string panelKey)
     {
         State = state;
         PanelKey = panelKey;
+
+        double scale = PanelPlacement.ClampScale(State.Config.Panels[PanelKey].Scale);
+        _scale = new ScaleTransform(scale, scale);
 
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -72,6 +98,28 @@ public abstract class PanelWindow : Window
     protected HudState State { get; }
 
     protected string PanelKey { get; }
+
+    /// <summary>
+    /// False for panels the user must never hide. The status panel keeps the
+    /// right-click menu reachable, so it is the only way back to other panels.
+    /// </summary>
+    protected virtual bool CanHide => true;
+
+    /// <summary>False disables the edge-drag resize grip for this panel.</summary>
+    protected virtual bool CanResize => true;
+
+    /// <summary>True for panels whose data can drive idle auto-hide.</summary>
+    protected virtual bool SupportsAutoHide => false;
+
+    /// <summary>Change tolerance for <see cref="ReadActivity"/> values (sensor jitter).</summary>
+    protected virtual float ActivityTolerance => 0f;
+
+    /// <summary>The telemetry this panel displays, used to detect when it goes stale.</summary>
+    protected virtual PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) => default;
+
+    /// <summary>Monotonic clock in seconds; overridable so tests can drive idle timing.</summary>
+    protected virtual double NowSeconds =>
+        System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
 
     /// <summary>
     /// Returns the native window state needed to distinguish a WPF visibility
@@ -249,7 +297,7 @@ public abstract class PanelWindow : Window
     /// <summary>Panels hide while there is no live data; the status panel stays.</summary>
     protected virtual bool HideWhenNoData => true;
 
-    /// <summary>Per-frame entry point called from the App render loop, after HudState.Tick.</summary>
+    /// <summary>Per-frame entry point called from the App frame timer, after HudState.Tick.</summary>
     public void RenderTick()
     {
         bool live = State.Live;
@@ -266,38 +314,7 @@ public abstract class PanelWindow : Window
         long started = System.Diagnostics.Stopwatch.GetTimestamp();
         try
         {
-            if (!live)
-            {
-                if (HideWhenNoData && Visibility != Visibility.Collapsed)
-                {
-                    Visibility = Visibility.Collapsed;
-                }
-
-                RenderNoData();
-                if (traceTransition)
-                {
-                    HudLog.Health($"[RENDER-TRACE] body-complete panel={GetType().Name} stage=RenderNoData");
-                    HudLog.Health($"[RENDER-TRACE] presentation-queued panel={GetType().Name}");
-                }
-
-                QueueNativePresentationRepair();
-                completed = true;
-                return;
-            }
-
-            if (Visibility != Visibility.Visible)
-            {
-                Visibility = Visibility.Visible;
-            }
-
-            Render(State.Latest!);
-            if (traceTransition)
-            {
-                HudLog.Health($"[RENDER-TRACE] body-complete panel={GetType().Name} stage=Render");
-                HudLog.Health($"[RENDER-TRACE] presentation-queued panel={GetType().Name}");
-            }
-
-            QueueNativePresentationRepair();
+            RenderFrame(live, traceTransition);
             completed = true;
         }
         finally
@@ -311,6 +328,81 @@ public abstract class PanelWindow : Window
                     $"completed={completed} elapsed={elapsedMs:0.0}ms visibility={Visibility}");
             }
         }
+    }
+
+    private void RenderFrame(bool live, bool traceTransition)
+    {
+        if (IsHiddenByPolicy(live))
+        {
+            if (Visibility != Visibility.Collapsed)
+            {
+                Visibility = Visibility.Collapsed;
+            }
+
+            return;
+        }
+
+        if (!live)
+        {
+            if (HideWhenNoData && Visibility != Visibility.Collapsed)
+            {
+                Visibility = Visibility.Collapsed;
+            }
+
+            RenderNoData();
+            if (traceTransition)
+            {
+                HudLog.Health($"[RENDER-TRACE] body-complete panel={GetType().Name} stage=RenderNoData");
+                HudLog.Health($"[RENDER-TRACE] presentation-queued panel={GetType().Name}");
+            }
+
+            QueueNativePresentationRepair();
+            return;
+        }
+
+        if (Visibility != Visibility.Visible)
+        {
+            Visibility = Visibility.Visible;
+        }
+
+        Render(State.Latest!);
+        if (traceTransition)
+        {
+            HudLog.Health($"[RENDER-TRACE] body-complete panel={GetType().Name} stage=Render");
+            HudLog.Health($"[RENDER-TRACE] presentation-queued panel={GetType().Name}");
+        }
+
+        QueueNativePresentationRepair();
+    }
+
+    /// <summary>
+    /// Decides whether the user's preferences hide the panel this frame: a
+    /// manual hide, or auto-hide after its own data went stale. Runs every frame
+    /// (even while hidden) so the activity tracker keeps watching for the data
+    /// to change again.
+    /// </summary>
+    private bool IsHiddenByPolicy(bool live)
+    {
+        var placement = State.Config.Panels[PanelKey];
+        if (live && SupportsAutoHide)
+        {
+            _activity ??= new PanelActivityTracker(ActivityTolerance);
+            _activity.Observe(ReadActivity(State.Latest!), NowSeconds);
+        }
+
+        bool userHidden = CanHide && placement.Hidden;
+        bool idleHidden = live
+            && SupportsAutoHide
+            && placement.AutoHide
+            && _activity?.IsStale(NowSeconds, placement.EffectiveIdleHideSeconds(State.Config.IdleHideSeconds)) == true;
+        bool hidden = userHidden || idleHidden;
+        if (hidden != _hiddenLastFrame)
+        {
+            _hiddenLastFrame = hidden;
+            HudLog.Debug($"panel={PanelKey} hidden={hidden} reason={(userHidden ? "user" : idleHidden ? "idle" : "none")}");
+        }
+
+        return hidden;
     }
 
     protected abstract void Render(Fh6Packet packet);
@@ -375,8 +467,22 @@ public abstract class PanelWindow : Window
     {
         // SizeToContent means the panel's size changes with its content (e.g.
         // the speed readout gaining a digit); re-anchor so the anchor point
-        // (e.g. the right edge of a right-aligned panel) stays put.
-        AnchorToPlacement();
+        // (e.g. the right edge of a right-aligned panel) stays put. During an
+        // edge resize the drag handler stores the new placement itself.
+        if (_resizeEdge is null)
+        {
+            AnchorToPlacement();
+        }
+    }
+
+    /// <summary>Applies the scale to the content so the window's SizeToContent follows it.</summary>
+    protected override void OnContentChanged(object oldContent, object newContent)
+    {
+        base.OnContentChanged(oldContent, newContent);
+        if (newContent is FrameworkElement element)
+        {
+            element.LayoutTransform = _scale;
+        }
     }
 
     private void AnchorToPlacement()
@@ -399,25 +505,178 @@ public abstract class PanelWindow : Window
             return;
         }
 
+        if (ResizeEdgeAt(e.GetPosition(this)) is { } edge)
+        {
+            BeginResize(edge, e);
+            return;
+        }
+
         MoveWindowForDrag();
         PersistPlacement();
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (_resizeEdge is { } edge)
+        {
+            UpdateResize(edge, e);
+            return;
+        }
+
+        Cursor = _clickThrough ? null : (ResizeEdgeAt(e.GetPosition(this)) switch
+        {
+            ResizeEdge.Left or ResizeEdge.Right => Cursors.SizeWE,
+            ResizeEdge.Top or ResizeEdge.Bottom => Cursors.SizeNS,
+            _ => null,
+        });
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonUp(e);
+        EndResize();
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        EndResize();
     }
 
     /// <summary>Moves the window for a left-button drag.</summary>
     protected virtual void MoveWindowForDrag() => DragMove();
 
+    /// <summary>
+    /// The band along each window edge that starts a resize instead of a move.
+    /// Horizontal edges win in the corners.
+    /// </summary>
+    private ResizeEdge? ResizeEdgeAt(Point p)
+    {
+        if (!CanResize || ActualWidth <= 0 || ActualHeight <= 0)
+        {
+            return null;
+        }
+
+        if (p.X <= ResizeGripDip)
+        {
+            return ResizeEdge.Left;
+        }
+
+        if (p.X >= ActualWidth - ResizeGripDip)
+        {
+            return ResizeEdge.Right;
+        }
+
+        if (p.Y <= ResizeGripDip)
+        {
+            return ResizeEdge.Top;
+        }
+
+        if (p.Y >= ActualHeight - ResizeGripDip)
+        {
+            return ResizeEdge.Bottom;
+        }
+
+        return null;
+    }
+
+    private void BeginResize(ResizeEdge edge, MouseButtonEventArgs e)
+    {
+        _resizeEdge = edge;
+        _resizePointerStart = PointToScreen(e.GetPosition(this));
+        _resizeStart = new ResizeStart(Left, Top, ActualWidth, ActualHeight, _scale.ScaleX);
+        CaptureMouse();
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Scales the panel uniformly so the dragged edge follows the pointer. The
+    /// edge opposite the dragged one stays fixed (right edge for a left drag,
+    /// bottom edge for a top drag). The other axis keeps its top or left edge.
+    /// </summary>
+    private void UpdateResize(ResizeEdge edge, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            EndResize();
+            return;
+        }
+
+        Point pointer = PointToScreen(e.GetPosition(this));
+        DpiScale dpi = VisualTreeHelper.GetDpi(this);
+        double dx = (pointer.X - _resizePointerStart.X) / dpi.DpiScaleX;
+        double dy = (pointer.Y - _resizePointerStart.Y) / dpi.DpiScaleY;
+        bool horizontal = edge is ResizeEdge.Left or ResizeEdge.Right;
+        double delta = edge switch
+        {
+            ResizeEdge.Right => dx,
+            ResizeEdge.Left => -dx,
+            ResizeEdge.Bottom => dy,
+            _ => -dy,
+        };
+
+        ResizeStart start = _resizeStart;
+        double extent = horizontal ? start.Width : start.Height;
+        if (extent <= 0)
+        {
+            return;
+        }
+
+        double scale = PanelPlacement.ClampScale(start.Scale * (extent + delta) / extent);
+        _scale.ScaleX = scale;
+        _scale.ScaleY = scale;
+        UpdateLayout();
+
+        double left = edge == ResizeEdge.Left ? start.Left + start.Width - ActualWidth : start.Left;
+        double top = edge == ResizeEdge.Top ? start.Top + start.Height - ActualHeight : start.Top;
+        State.Config.Panels[PanelKey].Scale = scale;
+        if (SetPlacementFromRect(left, top))
+        {
+            AnchorToPlacement();
+        }
+    }
+
+    private void EndResize()
+    {
+        if (_resizeEdge is null)
+        {
+            return;
+        }
+
+        _resizeEdge = null;
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        State.Config.Save();
+    }
+
     private void PersistPlacement()
+    {
+        if (SetPlacementFromRect(Left, Top))
+        {
+            State.Config.Save();
+        }
+    }
+
+    /// <summary>
+    /// Stores the anchor position for the window's current size, given its
+    /// top-left corner on screen. Returns false when there is no work area.
+    /// </summary>
+    private bool SetPlacementFromRect(double left, double top)
     {
         var placement = State.Config.Panels[PanelKey];
         var work = SystemParameters.WorkArea;
         if (work.Width <= 0 || work.Height <= 0)
         {
-            return;
+            return false;
         }
 
-        placement.X = (Left + AnchorOffsetX(placement.Anchor, ActualWidth) - work.Left) / work.Width;
-        placement.Y = (Top + AnchorOffsetY(placement.Anchor, ActualHeight) - work.Top) / work.Height;
-        State.Config.Save();
+        placement.X = (left + AnchorOffsetX(placement.Anchor, ActualWidth) - work.Left) / work.Width;
+        placement.Y = (top + AnchorOffsetY(placement.Anchor, ActualHeight) - work.Top) / work.Height;
+        return true;
     }
 
     private static double AnchorOffsetX(PanelAnchor anchor, double width) => anchor switch
@@ -457,6 +716,31 @@ public abstract class PanelWindow : Window
         clickThrough.Click += (_, _) => ToggleClickThroughAll();
         menu.Items.Add(clickThrough);
 
+        var panels = new MenuItem { Header = "Panels" };
+        foreach (var (key, label) in HideablePanels)
+        {
+            var item = new MenuItem { Header = label, Tag = key, IsCheckable = true };
+            item.Click += (_, _) => TogglePanelHidden(key);
+            panels.Items.Add(item);
+        }
+
+        panels.Items.Add(new Separator());
+        var showAll = new MenuItem { Header = "Show all panels" };
+        showAll.Click += (_, _) => ShowAllPanels();
+        panels.Items.Add(showAll);
+        menu.Items.Add(panels);
+
+        var autoHide = new MenuItem { Header = "Auto-hide when idle" };
+        foreach (var (key, label) in HideablePanels)
+        {
+            var item = new MenuItem { Header = label, Tag = key, IsCheckable = true };
+            item.Click += (_, _) => TogglePanelAutoHide(key);
+            autoHide.Items.Add(item);
+        }
+
+        menu.Items.Add(autoHide);
+        menu.Opened += (_, _) => SyncPanelChecks(panels, autoHide);
+
         menu.Items.Add(new Separator());
 
         var quit = new MenuItem { Header = "Quit" };
@@ -476,6 +760,49 @@ public abstract class PanelWindow : Window
                     && name.Equals(State.Config.TireCompound, StringComparison.OrdinalIgnoreCase);
             }
         }
+    }
+
+    private void SyncPanelChecks(MenuItem hideMenu, MenuItem autoHideMenu)
+    {
+        foreach (var entry in hideMenu.Items)
+        {
+            if (entry is MenuItem { Tag: string key } item)
+            {
+                item.IsChecked = !State.Config.Panels[key].Hidden;
+            }
+        }
+
+        foreach (var entry in autoHideMenu.Items)
+        {
+            if (entry is MenuItem { Tag: string key } item)
+            {
+                item.IsChecked = State.Config.Panels[key].AutoHide;
+            }
+        }
+    }
+
+    private void TogglePanelHidden(string key)
+    {
+        var placement = State.Config.Panels[key];
+        placement.Hidden = !placement.Hidden;
+        State.Config.Save();
+    }
+
+    private void TogglePanelAutoHide(string key)
+    {
+        var placement = State.Config.Panels[key];
+        placement.AutoHide = !placement.AutoHide;
+        State.Config.Save();
+    }
+
+    private void ShowAllPanels()
+    {
+        foreach (var (key, _) in HideablePanels)
+        {
+            State.Config.Panels[key].Hidden = false;
+        }
+
+        State.Config.Save();
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -526,6 +853,18 @@ public abstract class PanelWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    private enum ResizeEdge
+    {
+        Left,
+        Right,
+        Top,
+        Bottom,
+    }
+
+    /// <summary>Window geometry and scale captured when an edge drag starts.</summary>
+    [StructLayout(LayoutKind.Auto)]
+    private readonly record struct ResizeStart(double Left, double Top, double Width, double Height, double Scale);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
