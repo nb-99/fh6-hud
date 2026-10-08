@@ -15,7 +15,18 @@
   <ItemGroup>
     <Content Include="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <!-- Publish would overwrite the user's live layout; see PublishDefaultConfig. -->
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
+
+  <!--
+    The shipped config.json is only a first-run default. After a publish the
+    user's config.json (panel positions, sizes, visibility) lives in the publish
+    folder, so copy the default only when no config exists there yet.
+  -->
+  <Target Name="PublishDefaultConfig" AfterTargets="Publish" Condition="!Exists('$(PublishDir)config.json')">
+    <Copy SourceFiles="config.json" DestinationFolder="$(PublishDir)" />
+  </Target>
 
 </Project>

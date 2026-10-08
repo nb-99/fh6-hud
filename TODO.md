@@ -1,5 +1,10 @@
 # TODO
 
+## [ ] Continually adjust power curve & shifting recommendations
+
+**Always up to date power and shifts:** Sometimes, e.g. after de-tuning the car, or after a power spike due to poor grip, the power curve shows an impossibly high power number that is also taken into account by the shifting recommendation algorithm. I want the powerband and shifting suggestions to be recalculated when such an event appears, e.g. take the newest power number for a full throttle pull instead of the first one.
+Also, it has to be more visible that the current -> next gear shift is still being lernt.
+
 ## [x] Upshift indicator improvement — resolved in issue #11
 
 **"Steering-wheel light"-like experience:** Implement a visual cue similar to a steering-wheel light to indicate optimal upshift timing with an earlier signal that an upshift is coming up and how much time is left until the optimal upshift point. Sports cars often have a row of ligts in the top of the steering wheel that light up in sequence as the engine approaches the optimal upshift point. This could be implemented in the HUD as a series of lights or a bar that fills up as the engine approaches the optimal upshift point, providing a clear and intuitive visual cue for the driver, instead of only the existing flashing pill that only appears when the optimal upshift point is reached.
@@ -14,7 +19,7 @@ Shipped in issues #12–#14: six progressive lights (two yellow, two orange, two
 
 **Crashes:** The HUD sometimes crashes. Parts of the overlay remain visible but are stuck, not clickable and do not show new data. From a gut feeling, this mostly occurs after entering a menu or loading screen and then coming back to the game the HUD crashed.
 
-## [ ] Configurable Panels
+## [x] Configurable Panels
 
 **Hideable:** Panels should be individually hideable/deactivatable, either manually or by certain conditions (e.g. when tire temp has not changed in the last 10 secs e.g. when in the tuning menu, hide the tire temp panel)
 **Resizable:** Panels should be resizable via dragging their edges and their size persisted alongside their position in config.json
@@ -31,7 +36,7 @@ Shipped in issues #12–#14: six progressive lights (two yellow, two orange, two
 **Tire compound:** Show which tire compound is selected in the HUD.
 **Visibility:** Resolved in issue #4: the state and signed delta are larger and sit above the current temperature.
 
-## [ ] Makefile
+## [x] Makefile
 
 **make build:** builds the exe
 **make run:** builds + runs the exe

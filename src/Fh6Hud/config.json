@@ -4,12 +4,13 @@
     "TireCompound": "Rally",
     "TireOptMinC": 72.0,
     "TireOptMaxC": 90.0,
+    "IdleHideSeconds": 10.0,
     "Panels": {
-        "Tires": { "X": 0.2, "Y": 0.8, "Anchor": "BottomLeft" },
-        "Engine": { "X": 0.8, "Y": 0.8, "Anchor": "BottomRight" },
-        "Intervals": { "X": 1.0, "Y": 0.25, "Anchor": "TopRight" },
-        "Speedo": { "X": 1.0, "Y": 0.42, "Anchor": "TopRight" },
-        "Status": { "X": 0.5, "Y": 0.92, "Anchor": "BottomCenter" },
-        "ShiftCue": { "X": 0.5, "Y": 0.5, "Anchor": "Center" }
+        "Tires": { "X": 0.2, "Y": 0.8, "Anchor": "BottomLeft", "Scale": 1.0, "Hidden": false, "AutoHide": false, "IdleHideSeconds": 2.0 },
+        "Engine": { "X": 0.8, "Y": 0.8, "Anchor": "BottomRight", "Scale": 1.0, "Hidden": false, "AutoHide": false },
+        "Intervals": { "X": 1.0, "Y": 0.25, "Anchor": "TopRight", "Scale": 1.0, "Hidden": false, "AutoHide": false },
+        "Speedo": { "X": 1.0, "Y": 0.42, "Anchor": "TopRight", "Scale": 1.0, "Hidden": false, "AutoHide": false },
+        "Status": { "X": 0.5, "Y": 0.92, "Anchor": "BottomCenter", "Scale": 1.0, "Hidden": false, "AutoHide": false },
+        "ShiftCue": { "X": 0.5, "Y": 0.5, "Anchor": "Center", "Scale": 1.0, "Hidden": false, "AutoHide": false }
     }
 }

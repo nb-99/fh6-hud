@@ -42,6 +42,18 @@ public partial class TirePanel : PanelWindow
         UpdateRangeText();
     }
 
+    protected override bool SupportsAutoHide => true;
+
+    // Tire temperatures keep drifting while stationary in the tuning menu; 2 °C
+    // ignores that drift so the panel can go idle.
+    protected override float ActivityTolerance => 2f;
+
+    protected override PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) => new(
+        packet.TireTempFrontLeftC,
+        packet.TireTempFrontRightC,
+        packet.TireTempRearLeftC,
+        packet.TireTempRearRightC);
+
     protected override void Render(Fh6Packet packet)
     {
         UpdateRangeText();

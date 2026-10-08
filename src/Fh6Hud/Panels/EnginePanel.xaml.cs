@@ -26,6 +26,14 @@ public partial class EnginePanel : PanelWindow
         _mutedBrush = (SolidColorBrush)FindResource("MutedBrush");
     }
 
+    protected override bool SupportsAutoHide => true;
+
+    // Idle RPM wobbles by a few revs; 25 RPM is a deliberate rev, not jitter.
+    protected override float ActivityTolerance => 25f;
+
+    protected override PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) =>
+        new(packet.CurrentEngineRpm);
+
     protected override void Render(Fh6Packet packet)
     {
         float maxRpm = packet.EngineMaxRpm;

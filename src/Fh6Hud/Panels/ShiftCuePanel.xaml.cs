@@ -64,6 +64,13 @@ public partial class ShiftCuePanel : PanelWindow
 
     protected override bool HideWhenNoData => false;
 
+    protected override bool SupportsAutoHide => true;
+
+    protected override float ActivityTolerance => 25f;
+
+    protected override PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) =>
+        new(packet.CurrentEngineRpm, packet.Gear);
+
     protected override void Render(Fh6Packet packet)
     {
         bool forceUp = _forcedCue == CueDirection.Upshift;

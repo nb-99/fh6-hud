@@ -12,6 +12,13 @@ public partial class SpeedoPanel : PanelWindow
         InitializeComponent();
     }
 
+    protected override bool SupportsAutoHide => true;
+
+    protected override float ActivityTolerance => 0.5f;
+
+    protected override PanelActivityTracker.Sample ReadActivity(Fh6Packet packet) =>
+        new(packet.SpeedKmh);
+
     protected override void Render(Fh6Packet packet)
     {
         SetText(SpeedText, $"{packet.SpeedKmh:F0}");

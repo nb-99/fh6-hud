@@ -1,6 +1,6 @@
 using System.IO;
 using System.Windows;
-using System.Windows.Media;
+using System.Windows.Threading;
 using Fh6Hud.Telemetry;
 
 namespace Fh6Hud;
@@ -17,10 +17,12 @@ public partial class App : Application, IDisposable
 {
     private const int WatchdogIntervalMs = 2000;
     private const int WatchdogReportEveryTicks = 5; // 10 s
+    private const int FrameIntervalMs = 16; // ~60 Hz
 
     private readonly List<PanelWindow> _panels = new();
     private HudState? _state;
     private System.Threading.Timer? _watchdog;
+    private DispatcherTimer? _frameTimer;
 
     // Counters for the watchdog: render ticks since last interval, and the
     // listener's packet counter at the previous interval.
@@ -66,7 +68,18 @@ public partial class App : Application, IDisposable
             panel.Show();
         }
 
-        CompositionTarget.Rendering += OnRendering;
+        // A dispatcher timer drives the frame loop, not CompositionTarget.Rendering.
+        // WPF raises Rendering only when something on screen is dirty, so a HUD
+        // whose visible panels are static (or whose changing panels are hidden)
+        // stopped ticking: telemetry processing froze and hidden panels could
+        // never un-hide. The timer fires whether or not anything is drawn.
+        _frameTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(FrameIntervalMs),
+        };
+        _frameTimer.Tick += OnFrame;
+        _frameTimer.Start();
+
         // This must run off the WPF dispatcher. A dispatcher timer cannot
         // detect the exact failure mode we care about because it freezes with
         // the render loop.
@@ -81,7 +94,7 @@ public partial class App : Application, IDisposable
                      $"debug={HudLog.Enabled} hotkeyAvailable={PanelWindow.HotkeyAvailable}");
     }
 
-    private void OnRendering(object? sender, EventArgs e)
+    private void OnFrame(object? sender, EventArgs e)
     {
         Interlocked.Increment(ref _renderTicks);
         Volatile.Write(ref _lastRenderTimestamp, System.Diagnostics.Stopwatch.GetTimestamp());
@@ -199,6 +212,7 @@ public partial class App : Application, IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+        _frameTimer?.Stop();
         _watchdog?.Dispose();
         _state?.Dispose();
     }
@@ -206,7 +220,6 @@ public partial class App : Application, IDisposable
     protected override void OnExit(ExitEventArgs e)
     {
         HudLog.Info("shutdown");
-        CompositionTarget.Rendering -= OnRendering;
         Dispose();
         base.OnExit(e);
     }
