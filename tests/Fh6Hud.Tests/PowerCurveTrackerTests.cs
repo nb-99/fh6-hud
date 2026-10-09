@@ -5,7 +5,7 @@ namespace Fh6Hud.Tests;
 public class PowerCurveTrackerTests
 {
     [Fact]
-    public void TracksPerBucketPeaks_AndMaxPower()
+    public void TracksPerBucketMedian_AndMaxPower()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
@@ -15,8 +15,24 @@ public class PowerCurveTrackerTests
         tracker.AddSample(2000f, 90_000f);
         tracker.AddSample(5000f, 300_000f);
 
-        Assert.Equal(120_000f, tracker.Buckets[20]);
+        Assert.Equal(100_000f, tracker.Buckets[20]); // median of 100, 120, 90
         Assert.Equal(300_000f, tracker.Buckets[50]);
+        Assert.Equal(300_000f, tracker.MaxPowerW);
+    }
+
+    [Fact]
+    public void MaxPower_IgnoresAOneOffSpike()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        for (int i = 0; i < 4; i++)
+        {
+            tracker.AddSample(3000f, 300_000f);
+        }
+
+        tracker.AddSample(3000f, 900_000f); // grip spike
+
+        Assert.Equal(300_000f, tracker.Buckets[30]);
         Assert.Equal(300_000f, tracker.MaxPowerW);
     }
 
@@ -193,16 +209,33 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
-    public void WithinOneRun_TheHighestSampleInABucketIsKept()
+    public void ADipAtAShift_DoesNotDragTheBucketDown()
+    {
+        // Four normal readings at 7000 RPM, then one dip during a gear change.
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        Drive(tracker, 7000f, 600_000f, fromMs: 0, toMs: 1200);
+
+        tracker.Observe(Sample(7000f, 150_000f, 1216));
+
+        Assert.Equal(600_000f, tracker.Buckets[70]);
+    }
+
+    [Fact]
+    public void ReadingsAtTheSameTimestamp_CountOnce()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
+        Drive(tracker, 3000f, 200_000f, fromMs: 0, toMs: 1200);
 
-        tracker.Observe(Sample(3000f, 100_000f, 0));
-        tracker.Observe(Sample(3000f, 150_000f, 1000));
-        tracker.Observe(Sample(3000f, 120_000f, 1016));
+        // Re-reading the same packet every UI frame must not fill the window.
+        var packet = Sample(3000f, 100_000f, 1000);
+        for (int i = 0; i < 10; i++)
+        {
+            tracker.Observe(packet);
+        }
 
-        Assert.Equal(150_000f, tracker.Buckets[30]);
+        Assert.Equal(200_000f, tracker.Buckets[30]);
     }
 
     [Fact]

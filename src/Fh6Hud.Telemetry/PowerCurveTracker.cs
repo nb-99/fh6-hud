@@ -8,16 +8,18 @@ namespace Fh6Hud.Telemetry;
 /// <remarks>
 /// <list type="bullet">
 /// <item><see cref="Observe"/> is the telemetry path. Each full-throttle sample
-/// updates its bucket immediately. A bucket takes the value from the most
-/// recent full-throttle <i>run</i> that reached it (newest wins); within one
-/// run it keeps the highest value. Buckets a run did not reach keep their
-/// older values.</item>
+/// is recorded into its 100 RPM bucket, which keeps its last
+/// <see cref="SamplesPerBucket"/> samples. The bucket's shown value is the
+/// <b>median</b> of those samples. One odd reading (a dip at a gear change, a
+/// grip spike, boost still building) is outvoted by its neighbours in time,
+/// while a real change such as a detune still takes over within a few passes
+/// through that RPM.</item>
 /// <item>Power is ignored while boost is still building: after a long release
 /// (more than <see cref="ShortLiftMs"/>), the first <see cref="SettleMs"/> of
 /// renewed full throttle are not recorded. A short lift, such as a gear change,
 /// counts as continuous and records immediately.</item>
-/// <item><see cref="AddSample"/> is the low-level max-hold primitive used by
-/// tests and tooling. It does not apply the run or settle rules.</item>
+/// <item><see cref="AddSample"/> records one sample without the settle rules,
+/// for tests and tooling.</item>
 /// </list>
 /// </remarks>
 public sealed class PowerCurveTracker
@@ -28,24 +30,31 @@ public sealed class PowerCurveTracker
     /// <summary>Accelerator byte at or above which a sample counts as full throttle (~98%).</summary>
     public const byte FullThrottleAccel = 250;
 
+    /// <summary>Number of recent samples kept per bucket; the shown value is their median.</summary>
+    public const int SamplesPerBucket = 5;
+
     /// <summary>Time after a long release before renewed full throttle is recorded (boost build-up).</summary>
     public const int SettleMs = 1000;
 
     /// <summary>Releases shorter than this (e.g. a gear change) do not restart settling.</summary>
     public const int ShortLiftMs = 500;
 
-    private const int GearSlots = GearRatioTracker.MaxForwardGear + 1;
-
     private float[] _powerByBucket = Array.Empty<float>();
-    private int[] _runByBucket = Array.Empty<int>();
+
+    // Ring buffer of recent samples: bucket i owns [i * SamplesPerBucket, +SamplesPerBucket).
+    private float[] _samples = Array.Empty<float>();
+    private int[] _sampleCount = Array.Empty<int>();
+    private int[] _sampleNext = Array.Empty<int>();
+
     private float _maxRpm;
     private float _maxPowerW;
     private float _maxPowerRpm;
     private bool _dirty;
     private int _version;
 
-    // Full-throttle run state (see Observe).
-    private int _runId;
+    // Full-throttle state (see Observe).
+    private bool _hasObserved;
+    private uint _lastObservedMs;
     private bool _fullThrottle;
     private bool _hasRelease;
     private uint _releasedAtMs;
@@ -59,7 +68,7 @@ public sealed class PowerCurveTracker
     public float MaxPowerPs => _maxPowerW / WattsPerPs;
 
     /// <summary>
-    /// RPM at which the max power was sampled (bucket midpoint — buckets are
+    /// RPM at which the max power is shown (bucket midpoint — buckets are
     /// <see cref="BucketRpm"/> wide, so this is an estimate at bucket
     /// resolution). 0 until a sample arrived.
     /// </summary>
@@ -80,7 +89,7 @@ public sealed class PowerCurveTracker
 
     public int BucketCount => _powerByBucket.Length;
 
-    /// <summary>Per-bucket peak power in watts. 0 means the bucket has no sample.</summary>
+    /// <summary>Per-bucket power in watts (median of recent samples). 0 means the bucket has no sample.</summary>
     public IReadOnlyList<float> Buckets => _powerByBucket;
 
     /// <summary>Reconfigures buckets if max RPM changed (e.g. different car). Resets all data.</summary>
@@ -92,9 +101,7 @@ public sealed class PowerCurveTracker
         }
 
         _maxRpm = maxRpm;
-        int count = (int)(maxRpm / BucketRpm) + 1;
-        _powerByBucket = new float[count];
-        _runByBucket = new int[count];
+        AllocateBuckets((int)(maxRpm / BucketRpm) + 1);
         _maxPowerW = 0;
         _maxPowerRpm = 0;
         EndRun();
@@ -110,8 +117,7 @@ public sealed class PowerCurveTracker
     /// </summary>
     public void Reset()
     {
-        _powerByBucket = Array.Empty<float>();
-        _runByBucket = Array.Empty<int>();
+        AllocateBuckets(0);
         _maxRpm = 0;
         _maxPowerW = 0;
         _maxPowerRpm = 0;
@@ -121,39 +127,23 @@ public sealed class PowerCurveTracker
     }
 
     /// <summary>
-    /// Records a sample directly into its bucket (max-hold). Returns true if a
-    /// bucket peak increased. Telemetry should use <see cref="Observe"/>.
+    /// Records one power sample into its bucket, without the settle rules.
+    /// Returns false when the curve is not configured or the power is not positive.
     /// </summary>
     public bool AddSample(float rpm, float powerW)
     {
-        if (_powerByBucket.Length == 0 || rpm < 0)
+        if (_powerByBucket.Length == 0 || rpm < 0 || !(powerW > 0f))
         {
             return false;
         }
 
-        int idx = BucketIndex(rpm);
-        if (!(powerW > _powerByBucket[idx]))
-        {
-            return false;
-        }
-
-        _powerByBucket[idx] = powerW;
-        if (powerW > _maxPowerW)
-        {
-            _maxPowerW = powerW;
-            // The peak landed somewhere inside the bucket; the midpoint is the
-            // best estimate at bucket resolution.
-            _maxPowerRpm = Math.Min(_maxRpm, idx * BucketRpm + BucketRpm / 2f);
-        }
-
-        _dirty = true;
-        _version++;
+        Record(BucketIndex(rpm), powerW);
         return true;
     }
 
     /// <summary>
     /// Records one telemetry packet. Call once per UI frame with the latest
-    /// packet; repeated calls with the same packet change nothing.
+    /// packet; a packet already seen (same timestamp) changes nothing.
     /// </summary>
     public void Observe(Fh6Packet packet)
     {
@@ -161,6 +151,14 @@ public sealed class PowerCurveTracker
         {
             return;
         }
+
+        if (_hasObserved && packet.TimestampMs == _lastObservedMs)
+        {
+            return; // the UI re-reads the latest packet every frame
+        }
+
+        _hasObserved = true;
+        _lastObservedMs = packet.TimestampMs;
 
         if (packet.Accel < FullThrottleAccel)
         {
@@ -194,25 +192,7 @@ public sealed class PowerCurveTracker
             return;
         }
 
-        int idx = BucketIndex(packet.CurrentEngineRpm);
-        if (_runByBucket[idx] != _runId)
-        {
-            // First settled sample of this run in this bucket: newest run wins.
-            _powerByBucket[idx] = packet.PowerWatts;
-            _runByBucket[idx] = _runId;
-        }
-        else if (packet.PowerWatts > _powerByBucket[idx])
-        {
-            _powerByBucket[idx] = packet.PowerWatts;
-        }
-        else
-        {
-            return;
-        }
-
-        RecalculateMaxPower();
-        _dirty = true;
-        _version++;
+        Record(BucketIndex(packet.CurrentEngineRpm), packet.PowerWatts);
     }
 
     /// <summary>
@@ -274,16 +254,62 @@ public sealed class PowerCurveTracker
 
     public static float WattsToPs(float watts) => watts / WattsPerPs;
 
+    private void AllocateBuckets(int count)
+    {
+        _powerByBucket = new float[count];
+        _samples = new float[count * SamplesPerBucket];
+        _sampleCount = new int[count];
+        _sampleNext = new int[count];
+    }
+
     private void StartRun(uint nowMs)
     {
         _fullThrottle = true;
-        _runId++;
 
         // A short lift (gear change) keeps the boost up: record right away.
         // Otherwise wait for the boost to build.
         bool shortLift = _hasRelease && ElapsedMs(_releasedAtMs, nowMs) < ShortLiftMs;
         _settled = shortLift;
         _settleAtMs = unchecked(nowMs + (uint)SettleMs);
+    }
+
+    /// <summary>
+    /// Adds a sample to a bucket's window and updates the bucket to the median
+    /// of that window, then refreshes max power.
+    /// </summary>
+    private void Record(int idx, float powerW)
+    {
+        int baseIdx = idx * SamplesPerBucket;
+        _samples[baseIdx + _sampleNext[idx]] = powerW;
+        _sampleNext[idx] = (_sampleNext[idx] + 1) % SamplesPerBucket;
+        _sampleCount[idx] = Math.Min(_sampleCount[idx] + 1, SamplesPerBucket);
+
+        _powerByBucket[idx] = MedianOf(baseIdx, _sampleCount[idx]);
+        RecalculateMaxPower();
+        _dirty = true;
+        _version++;
+    }
+
+    /// <summary>Median of the first <paramref name="count"/> samples starting at <paramref name="start"/>.</summary>
+    private float MedianOf(int start, int count)
+    {
+        Span<float> sorted = stackalloc float[SamplesPerBucket];
+        for (int i = 0; i < count; i++)
+        {
+            float value = _samples[start + i];
+            int j = i - 1;
+            while (j >= 0 && sorted[j] > value)
+            {
+                sorted[j + 1] = sorted[j];
+                j--;
+            }
+
+            sorted[j + 1] = value;
+        }
+
+        return count % 2 == 1
+            ? sorted[count / 2]
+            : (sorted[count / 2 - 1] + sorted[count / 2]) / 2f;
     }
 
     /// <summary>
