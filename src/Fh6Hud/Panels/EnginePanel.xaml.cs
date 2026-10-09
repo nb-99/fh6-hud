@@ -86,19 +86,12 @@ public partial class EnginePanel : PanelWindow
                         && GearRatioTracker.IsLearnableGear(packet.Gear)
                         && packet.Gear < GearRatioTracker.MaxForwardGear;
 
-        // Title: steady hint with the learned upshift point for this gear. While
-        // learning, show how many full-throttle pulls have covered this gear so
-        // progress is visible rather than a static label.
+        // Title: steady hint with the learned upshift point for this gear.
         SetText(
             ShiftText,
-            shiftRpm is { } rpm
-                ? $"SHIFT @ {rpm:F0}"
-                : learning ? LearningText(State.PowerCurve.GetPullCount(packet.Gear)) : "SHIFT --");
+            shiftRpm is { } rpm ? $"SHIFT @ {rpm:F0}" : learning ? "SHIFT LEARNING" : "SHIFT --");
         ShiftText.Foreground = shiftRpm is null ? _mutedBrush : _accentBrush;
     }
-
-    private static string LearningText(int pulls) =>
-        pulls == 1 ? "SHIFT LEARNING · 1 PULL" : $"SHIFT LEARNING · {pulls} PULLS";
 
     private void RebuildPowerCurve()
     {

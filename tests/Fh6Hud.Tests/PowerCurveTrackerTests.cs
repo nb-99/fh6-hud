@@ -95,72 +95,97 @@ public class PowerCurveTrackerTests
         Assert.Equal(0f, tracker.MaxPowerW);
     }
 
-    private const byte FullThrottle = 255;
+    private static Fh6Packet Sample(float rpm, float powerW, uint timestampMs, byte accel = 255, byte gear = 3) =>
+        Fh6Packet.Parse(new Fh6PacketBuilder()
+            .IsRaceOn(1)
+            .EngineMaxRpm(7000f)
+            .CurrentEngineRpm(rpm)
+            .PowerWatts(powerW)
+            .TimestampMs(timestampMs)
+            .Accel(accel)
+            .Gear(gear)
+            .Build())!;
 
-    /// <summary>Feeds a full-throttle pull of identical samples at one RPM and power.</summary>
-    private static void FeedPull(PowerCurveTracker tracker, float rpm, float powerW, byte gear = 3, int samples = PowerCurveTracker.MinSamplesPerPull)
+    /// <summary>Full throttle at a steady RPM and power, sampled every 16 ms from <paramref name="fromMs"/>.</summary>
+    private static void Drive(PowerCurveTracker tracker, float rpm, float powerW, uint fromMs, uint toMs)
     {
-        for (int i = 0; i < samples; i++)
+        for (uint t = fromMs; t <= toMs; t += 16)
         {
-            tracker.AddPullSample(rpm, powerW, FullThrottle, gear);
+            tracker.Observe(Sample(rpm, powerW, t));
         }
     }
 
-    /// <summary>Releases the throttle, which ends the current pull.</summary>
-    private static void ReleaseThrottle(PowerCurveTracker tracker) =>
-        tracker.AddPullSample(0f, 0f, 0, 3);
-
     [Fact]
-    public void PullIsNotVisibleUntilItEnds()
+    public void Observe_UpdatesTheCurveWhileDriving_WithoutAnyRelease()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
         int version = tracker.Version;
 
-        FeedPull(tracker, 3000f, 200_000f);
-
+        // First second at full throttle: boost is still building, nothing recorded yet.
+        Drive(tracker, 3000f, 200_000f, fromMs: 0, toMs: 500);
         Assert.Equal(0f, tracker.Buckets[30]);
-        Assert.Equal(0f, tracker.MaxPowerW);
         Assert.Equal(version, tracker.Version);
 
-        ReleaseThrottle(tracker);
-
+        Drive(tracker, 3000f, 200_000f, fromMs: 1000, toMs: 1000);
         Assert.Equal(200_000f, tracker.Buckets[30]);
         Assert.Equal(200_000f, tracker.MaxPowerW);
-        Assert.True(tracker.Version > version);
     }
 
     [Fact]
-    public void NewestPull_ReplacesAnOlderSpike()
+    public void BoostBuildingAfterALongRelease_IsNotRecorded()
     {
-        // A grip-induced spike is the first pull; the next normal pull must
-        // replace it, instead of the spike staying as an all-time maximum.
+        // Good full-range run, then a long lift and throttle reapplied at
+        // 5000 RPM. The first second after reapplying must not overwrite the curve.
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
+        Drive(tracker, 5000f, 400_000f, fromMs: 0, toMs: 2000);
+        Assert.Equal(400_000f, tracker.Buckets[50]);
 
-        FeedPull(tracker, 3000f, 400_000f);
-        ReleaseThrottle(tracker);
-        Assert.Equal(400_000f, tracker.MaxPowerW);
+        tracker.Observe(Sample(5000f, 0f, 3000, accel: 0));  // released
+        Drive(tracker, 5000f, 150_000f, fromMs: 5000, toMs: 5800);
 
-        FeedPull(tracker, 3000f, 300_000f);
-        ReleaseThrottle(tracker);
+        Assert.Equal(400_000f, tracker.Buckets[50]);
+    }
 
-        Assert.Equal(300_000f, tracker.Buckets[30]);
+    [Fact]
+    public void AfterTheSettleWindow_TheNewRunReplacesTheOldValue()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        Drive(tracker, 5000f, 400_000f, fromMs: 0, toMs: 2000);
+
+        tracker.Observe(Sample(5000f, 0f, 3000, accel: 0));
+        Drive(tracker, 5000f, 300_000f, fromMs: 5000, toMs: 7000);
+
+        Assert.Equal(300_000f, tracker.Buckets[50]);
         Assert.Equal(300_000f, tracker.MaxPowerW);
     }
 
     [Fact]
-    public void NewestPull_LeavesBucketsItDidNotReachUntouched()
+    public void ShortLift_LikeAGearChange_RecordsImmediately()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
+        Drive(tracker, 6000f, 350_000f, fromMs: 0, toMs: 2000);
 
-        FeedPull(tracker, 3000f, 400_000f);
-        FeedPull(tracker, 5000f, 350_000f);
-        ReleaseThrottle(tracker);
+        // 100 ms lift for a gear change, then power comes back at a lower RPM.
+        tracker.Observe(Sample(6000f, 0f, 2100, accel: 0));
+        tracker.Observe(Sample(4500f, 280_000f, 2200));
 
-        FeedPull(tracker, 3000f, 300_000f);
-        ReleaseThrottle(tracker);
+        Assert.Equal(280_000f, tracker.Buckets[45]);
+    }
+
+    [Fact]
+    public void ANewRun_LeavesBucketsItDidNotReachUntouched()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        Drive(tracker, 3000f, 400_000f, fromMs: 0, toMs: 2000);
+        Drive(tracker, 5000f, 350_000f, fromMs: 2000, toMs: 2500);
+
+        tracker.Observe(Sample(3000f, 0f, 3000, accel: 0));
+        Drive(tracker, 3000f, 300_000f, fromMs: 5000, toMs: 7000);
 
         Assert.Equal(350_000f, tracker.Buckets[50]);
         Assert.Equal(350_000f, tracker.MaxPowerW);
@@ -168,116 +193,61 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
-    public void Pull_KeepsThePeakWithinThatPull()
+    public void WithinOneRun_TheHighestSampleInABucketIsKept()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
 
-        for (int i = 0; i < PowerCurveTracker.MinSamplesPerPull; i++)
-        {
-            float power = i switch { 2 => 150_000f, 5 => 120_000f, _ => 100_000f };
-            tracker.AddPullSample(3000f, power, FullThrottle, 3);
-        }
-
-        ReleaseThrottle(tracker);
+        tracker.Observe(Sample(3000f, 100_000f, 0));
+        tracker.Observe(Sample(3000f, 150_000f, 1000));
+        tracker.Observe(Sample(3000f, 120_000f, 1016));
 
         Assert.Equal(150_000f, tracker.Buckets[30]);
     }
 
     [Fact]
-    public void PullStartedHighInTheRange_DoesNotOverwriteAGoodCurve()
+    public void SameRunAgain_IsANoOp()
     {
-        // Good full pull from low RPM, then a lift and throttle reapplied at
-        // 5000 RPM while boost is still building: its low readings must not
-        // replace the stored curve at 5000 RPM.
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
+        Drive(tracker, 3000f, 200_000f, fromMs: 0, toMs: 1000);
 
-        FeedPull(tracker, 1500f, 150_000f);
-        FeedPull(tracker, 5000f, 400_000f);
-        ReleaseThrottle(tracker);
-
-        FeedPull(tracker, 5000f, 200_000f);
-        ReleaseThrottle(tracker);
-
-        Assert.Equal(400_000f, tracker.Buckets[50]);
-        Assert.Equal(400_000f, tracker.MaxPowerW);
+        // The UI calls Observe every frame with the same packet: the first call
+        // may change the curve, repeats must not.
+        var packet = Sample(3000f, 200_000f, 1000);
+        tracker.Observe(packet);
+        int version = tracker.Version;
+        tracker.Observe(packet);
+        Assert.Equal(version, tracker.Version);
     }
 
     [Fact]
-    public void PullStartedInTheLowerRange_StillCommits()
+    public void EndRun_MakesTheNextFullThrottleWaitForBoostAgain()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
+        Drive(tracker, 3000f, 200_000f, fromMs: 0, toMs: 2000);
 
-        // Starts at 3500 RPM, exactly PullStartMaxFraction of 7000.
-        FeedPull(tracker, 3500f, 250_000f);
-        ReleaseThrottle(tracker);
-
-        Assert.Equal(250_000f, tracker.Buckets[35]);
-    }
-
-    [Fact]
-    public void ShortPull_IsDiscarded()
-    {
-        // One-frame throttle taps must not overwrite the curve.
-        var tracker = new PowerCurveTracker();
-        tracker.Configure(7000f);
-
-        FeedPull(tracker, 3000f, 400_000f, samples: PowerCurveTracker.MinSamplesPerPull - 1);
-        ReleaseThrottle(tracker);
-
-        Assert.Equal(0f, tracker.Buckets[30]);
-        Assert.Equal(0f, tracker.MaxPowerW);
-    }
-
-    [Fact]
-    public void EndPull_CommitsAPullWithoutAThrottleRelease()
-    {
-        // Telemetry going stale (menu, loading) ends the pull explicitly.
-        var tracker = new PowerCurveTracker();
-        tracker.Configure(7000f);
-
-        FeedPull(tracker, 3000f, 200_000f);
-        tracker.EndPull();
+        // Telemetry went stale (menu). When the game resumes, the first second is not recorded.
+        tracker.EndRun();
+        Drive(tracker, 3000f, 100_000f, fromMs: 9000, toMs: 9500);
 
         Assert.Equal(200_000f, tracker.Buckets[30]);
     }
 
     [Fact]
-    public void PullCounts_CountCommittedPullsPerGearUsed()
+    public void Settle_WorksAcrossTheTimestampWrap()
     {
         var tracker = new PowerCurveTracker();
         tracker.Configure(7000f);
+        uint start = uint.MaxValue - 200;
 
-        FeedPull(tracker, 3000f, 200_000f, gear: 3);
-        FeedPull(tracker, 4000f, 220_000f, gear: 4);
-        ReleaseThrottle(tracker);
-        Assert.Equal(1, tracker.GetPullCount(3));
-        Assert.Equal(1, tracker.GetPullCount(4));
-        Assert.Equal(0, tracker.GetPullCount(5));
+        // Settling ends 1000 ms later, which wraps past zero.
+        tracker.Observe(Sample(3000f, 200_000f, start));
+        Assert.Equal(0f, tracker.Buckets[30]);
 
-        FeedPull(tracker, 3000f, 210_000f, gear: 3);
-        ReleaseThrottle(tracker);
-        Assert.Equal(2, tracker.GetPullCount(3));
-    }
-
-    [Fact]
-    public void Reset_ClearsPendingPullAndPullCounts()
-    {
-        var tracker = new PowerCurveTracker();
-        tracker.Configure(7000f);
-        FeedPull(tracker, 3000f, 200_000f);
-        ReleaseThrottle(tracker);
-
-        FeedPull(tracker, 4000f, 300_000f); // still pending when the car changes
-        tracker.Reset();
-        tracker.Configure(7000f);
-        ReleaseThrottle(tracker);
-
-        Assert.Equal(0f, tracker.MaxPowerW);
-        Assert.All(tracker.Buckets, b => Assert.Equal(0f, b));
-        Assert.Equal(0, tracker.GetPullCount(3));
+        tracker.Observe(Sample(3000f, 200_000f, unchecked(start + 1000)));
+        Assert.Equal(200_000f, tracker.Buckets[30]);
     }
 
     [Fact]

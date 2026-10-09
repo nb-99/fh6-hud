@@ -37,25 +37,6 @@ public static class Program
         return GearTopSpeedMs.Length;
     }
 
-    /// <summary>
-    /// True for the short window just after each simulated upshift, when a
-    /// driver lifts off the throttle. The HUD commits a full-throttle pull when
-    /// the throttle is released, so this keeps each gear run a separate pull.
-    /// </summary>
-    private static bool IsUpshiftLift(float speed)
-    {
-        for (int g = 0; g < GearTopSpeedMs.Length - 1; g++)
-        {
-            float shiftSpeed = GearTopSpeedMs[g] * (SimShiftRpm / MaxRpm);
-            if (speed >= shiftSpeed && speed < shiftSpeed + 0.6f)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static float RpmFor(float speed, int gear)
     {
         if (speed < 0.1f)
@@ -179,7 +160,7 @@ public static class Program
             .PowerWatts(power)
             .TorqueNm(450f)
             .TireTempC(fl, fr, rl, rr)
-            .Accel(IsUpshiftLift(speed) ? (byte)0 : (byte)255)
+            .Accel(255)
             .Gear((byte)gear);
 
         return builder.Build();

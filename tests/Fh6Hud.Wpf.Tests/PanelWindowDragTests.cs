@@ -131,7 +131,7 @@ public sealed class PanelWindowDragTests
 
             // Engine panel learning status (issue #14).
             Assert.Equal("SHIFT @ 6200", result.EngineShiftHint.LearnedText);
-            Assert.Equal("SHIFT LEARNING · 0 PULLS", result.EngineShiftHint.LearningText);
+            Assert.Equal("SHIFT LEARNING", result.EngineShiftHint.LearningText);
             Assert.Equal("SHIFT --", result.EngineShiftHint.TopGearText);
             Assert.Equal("SHIFT --", result.EngineShiftHint.NeutralText);
             Assert.Equal("SHIFT --", result.EngineShiftHint.ReverseText);
@@ -901,31 +901,9 @@ public sealed class PanelWindowDragTests
             .CurrentEngineRpm(rpm)
             .SpeedMs(speed)
             .PowerWatts(power)
-            .Accel(IsSimulatedUpshiftLift(speed) ? (byte)0 : (byte)255)
+            .Accel(255)
             .Gear((byte)gear)
             .Build())!;
-    }
-
-    /// <summary>
-    /// True just after each simulated upshift, when the driver lifts. Full
-    /// throttle is released briefly so the pull commits and the curve learns
-    /// per gear, as it would in a real run.
-    /// </summary>
-    private static bool IsSimulatedUpshiftLift(float speed)
-    {
-        float[] gearTopSpeedMs = { 22.5f, 34.8f, 47.8f, 61.2f, 76.5f, 90f };
-        const float simShiftRpm = 6900f;
-        const float maxRpm = 7000f;
-        for (int g = 0; g < gearTopSpeedMs.Length - 1; g++)
-        {
-            float shiftSpeed = gearTopSpeedMs[g] * (simShiftRpm / maxRpm);
-            if (speed >= shiftSpeed && speed < shiftSpeed + 0.6f)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>A panel that opts into idle auto-hide on engine RPM, with a test clock.</summary>

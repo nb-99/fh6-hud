@@ -2,19 +2,22 @@ namespace Fh6Hud.Telemetry;
 
 /// <summary>
 /// Tracks engine power (watts) per RPM bucket so a dyno-style power curve and
-/// the max power can be displayed and used for shift advice.
+/// the max power can be displayed and used for shift advice. The curve updates
+/// live while driving at full throttle.
 /// </summary>
 /// <remarks>
-/// Two ways in:
 /// <list type="bullet">
-/// <item><see cref="AddSample"/> raises a bucket's peak immediately (max-hold).
-/// It is the low-level primitive and never forgets a value on its own.</item>
-/// <item><see cref="AddPullSample"/> is the telemetry path. Samples are grouped
-/// into full-throttle <i>pulls</i>; when a pull ends (throttle released or
-/// <see cref="EndPull"/>), its per-bucket peaks overwrite the stored buckets it
-/// touched. The newest pull wins, so a grip spike or a de-tune is replaced by
-/// the next normal pull instead of living forever as an all-time maximum.
-/// Buckets the newest pull did not reach keep their older values.</item>
+/// <item><see cref="Observe"/> is the telemetry path. Each full-throttle sample
+/// updates its bucket immediately. A bucket takes the value from the most
+/// recent full-throttle <i>run</i> that reached it (newest wins); within one
+/// run it keeps the highest value. Buckets a run did not reach keep their
+/// older values.</item>
+/// <item>Power is ignored while boost is still building: after a long release
+/// (more than <see cref="ShortLiftMs"/>), the first <see cref="SettleMs"/> of
+/// renewed full throttle are not recorded. A short lift, such as a gear change,
+/// counts as continuous and records immediately.</item>
+/// <item><see cref="AddSample"/> is the low-level max-hold primitive used by
+/// tests and tooling. It does not apply the run or settle rules.</item>
 /// </list>
 /// </remarks>
 public sealed class PowerCurveTracker
@@ -25,38 +28,29 @@ public sealed class PowerCurveTracker
     /// <summary>Accelerator byte at or above which a sample counts as full throttle (~98%).</summary>
     public const byte FullThrottleAccel = 250;
 
-    /// <summary>
-    /// Minimum samples in a pull before it may replace stored data. At ~60 Hz
-    /// this is about 0.17 s, so a one-frame throttle tap cannot overwrite the curve.
-    /// </summary>
-    public const int MinSamplesPerPull = 10;
+    /// <summary>Time after a long release before renewed full throttle is recorded (boost build-up).</summary>
+    public const int SettleMs = 1000;
 
-    /// <summary>
-    /// A pull may only replace stored data if it started at or below this
-    /// fraction of max RPM. A pull that begins higher (e.g. throttle reapplied
-    /// at speed after a lift) reads power while boost is still building, so its
-    /// values are too low and would overwrite a good full-range curve.
-    /// </summary>
-    public const float PullStartMaxFraction = 0.5f;
+    /// <summary>Releases shorter than this (e.g. a gear change) do not restart settling.</summary>
+    public const int ShortLiftMs = 500;
 
     private const int GearSlots = GearRatioTracker.MaxForwardGear + 1;
 
     private float[] _powerByBucket = Array.Empty<float>();
+    private int[] _runByBucket = Array.Empty<int>();
     private float _maxRpm;
     private float _maxPowerW;
     private float _maxPowerRpm;
     private bool _dirty;
     private int _version;
 
-    // Current full-throttle pull, not yet committed to _powerByBucket.
-    private float[] _pendingByBucket = Array.Empty<float>();
-    private readonly List<int> _pendingBuckets = new();
-    private int _pendingSamples;
-    private int _pendingGearMask;
-    private float _pendingStartRpm;
-
-    // Committed pulls per forward gear (index = gear).
-    private readonly int[] _pullsByGear = new int[GearSlots];
+    // Full-throttle run state (see Observe).
+    private int _runId;
+    private bool _fullThrottle;
+    private bool _hasRelease;
+    private uint _releasedAtMs;
+    private bool _settled;
+    private uint _settleAtMs;
 
     public float MaxRpm => _maxRpm;
 
@@ -78,22 +72,16 @@ public sealed class PowerCurveTracker
     }
 
     /// <summary>
-    /// Increments whenever the committed curve changes (accepted sample, pull
-    /// commit, configure, reset). Lets consumers like <see cref="ShiftPointAdvisor"/>
-    /// cache derived results without touching <see cref="IsDirty"/>, which the UI owns.
+    /// Increments whenever the curve changes (accepted sample, configure, reset).
+    /// Lets consumers like <see cref="ShiftPointAdvisor"/> cache derived results
+    /// without touching <see cref="IsDirty"/>, which the UI owns.
     /// </summary>
     public int Version => _version;
 
     public int BucketCount => _powerByBucket.Length;
 
+    /// <summary>Per-bucket peak power in watts. 0 means the bucket has no sample.</summary>
     public IReadOnlyList<float> Buckets => _powerByBucket;
-
-    /// <summary>
-    /// Number of committed full-throttle pulls in which the gear was in use.
-    /// Used to show how far shift learning has progressed for that gear.
-    /// </summary>
-    public int GetPullCount(int gear) =>
-        gear >= 1 && gear < GearSlots ? _pullsByGear[gear] : 0;
 
     /// <summary>Reconfigures buckets if max RPM changed (e.g. different car). Resets all data.</summary>
     public void Configure(float maxRpm)
@@ -106,34 +94,35 @@ public sealed class PowerCurveTracker
         _maxRpm = maxRpm;
         int count = (int)(maxRpm / BucketRpm) + 1;
         _powerByBucket = new float[count];
+        _runByBucket = new int[count];
         _maxPowerW = 0;
         _maxPowerRpm = 0;
-        ClearPull();
+        EndRun();
         _dirty = true;
         _version++;
     }
 
     /// <summary>
-    /// Drops all sampled data, pending pull and pull counts, and forgets the
-    /// configured max RPM, so the next <see cref="Configure"/> call
-    /// re-initializes from scratch. Used on car switch: two cars may share a
-    /// redline, so <c>Configure</c> alone would keep the previous car's curve.
+    /// Drops all sampled data and forgets the configured max RPM, so the next
+    /// <see cref="Configure"/> call re-initializes from scratch. Used on car
+    /// switch: two cars may share a redline, so <c>Configure</c> alone would
+    /// keep the previous car's curve.
     /// </summary>
     public void Reset()
     {
         _powerByBucket = Array.Empty<float>();
+        _runByBucket = Array.Empty<int>();
         _maxRpm = 0;
         _maxPowerW = 0;
         _maxPowerRpm = 0;
-        ClearPull();
-        Array.Clear(_pullsByGear);
+        EndRun();
         _dirty = true;
         _version++;
     }
 
     /// <summary>
     /// Records a sample directly into its bucket (max-hold). Returns true if a
-    /// bucket peak increased. Telemetry should use <see cref="AddPullSample"/>.
+    /// bucket peak increased. Telemetry should use <see cref="Observe"/>.
     /// </summary>
     public bool AddSample(float rpm, float powerW)
     {
@@ -163,73 +152,78 @@ public sealed class PowerCurveTracker
     }
 
     /// <summary>
-    /// Records one telemetry sample. Full-throttle samples accumulate into the
-    /// current pull (per-bucket peak). A sample below full throttle ends the
-    /// pull, which commits it if it was long enough (see <see cref="EndPull"/>).
+    /// Records one telemetry packet. Call once per UI frame with the latest
+    /// packet; repeated calls with the same packet change nothing.
     /// </summary>
-    public void AddPullSample(float rpm, float powerW, byte accel, byte gear)
+    public void Observe(Fh6Packet packet)
     {
-        if (_powerByBucket.Length == 0 || rpm < 0)
+        if (_powerByBucket.Length == 0 || packet.CurrentEngineRpm < 0f)
         {
             return;
         }
 
-        if (accel < FullThrottleAccel)
+        if (packet.Accel < FullThrottleAccel)
         {
-            EndPull();
+            if (_fullThrottle)
+            {
+                _fullThrottle = false;
+                _hasRelease = true;
+                _releasedAtMs = packet.TimestampMs;
+            }
+
             return;
         }
 
-        if (!(powerW > 0f))
+        if (!_fullThrottle)
+        {
+            StartRun(packet.TimestampMs);
+        }
+
+        if (!_settled)
+        {
+            if (ElapsedMs(_settleAtMs, packet.TimestampMs) < 0)
+            {
+                return; // boost still building
+            }
+
+            _settled = true;
+        }
+
+        if (!(packet.PowerWatts > 0f))
         {
             return;
         }
 
-        if (_pendingSamples == 0)
+        int idx = BucketIndex(packet.CurrentEngineRpm);
+        if (_runByBucket[idx] != _runId)
         {
-            _pendingStartRpm = rpm;
+            // First settled sample of this run in this bucket: newest run wins.
+            _powerByBucket[idx] = packet.PowerWatts;
+            _runByBucket[idx] = _runId;
         }
-
-        int idx = BucketIndex(rpm);
-        if (!(powerW > _pendingByBucket[idx]))
+        else if (packet.PowerWatts > _powerByBucket[idx])
         {
-            // Still counts toward the pull's length even if it is not a new peak.
-            _pendingSamples++;
+            _powerByBucket[idx] = packet.PowerWatts;
+        }
+        else
+        {
             return;
         }
 
-        if (_pendingByBucket[idx] <= 0f)
-        {
-            _pendingBuckets.Add(idx);
-        }
-
-        _pendingByBucket[idx] = powerW;
-        _pendingSamples++;
-        if (GearRatioTracker.IsLearnableGear(gear))
-        {
-            _pendingGearMask |= 1 << gear;
-        }
+        RecalculateMaxPower();
+        _dirty = true;
+        _version++;
     }
 
     /// <summary>
-    /// Ends the current pull. A pull with at least <see cref="MinSamplesPerPull"/>
-    /// samples replaces the buckets it reached and bumps <see cref="Version"/>;
-    /// a shorter one is discarded. Call when telemetry goes stale so a pull
-    /// never spans a menu or loading screen.
+    /// Forgets the current full-throttle run, so the next full throttle waits
+    /// for boost to build again. Call when telemetry goes stale (menu, loading).
     /// </summary>
-    public void EndPull()
+    public void EndRun()
     {
-        if (_pendingSamples == 0)
-        {
-            return;
-        }
-
-        if (_pendingSamples >= MinSamplesPerPull && IsFullRangePull())
-        {
-            CommitPull();
-        }
-
-        ClearPull();
+        _fullThrottle = false;
+        _hasRelease = false;
+        _settled = false;
     }
 
     /// <summary>
@@ -280,37 +274,32 @@ public sealed class PowerCurveTracker
 
     public static float WattsToPs(float watts) => watts / WattsPerPs;
 
+    private void StartRun(uint nowMs)
+    {
+        _fullThrottle = true;
+        _runId++;
+
+        // A short lift (gear change) keeps the boost up: record right away.
+        // Otherwise wait for the boost to build.
+        bool shortLift = _hasRelease && ElapsedMs(_releasedAtMs, nowMs) < ShortLiftMs;
+        _settled = shortLift;
+        _settleAtMs = unchecked(nowMs + (uint)SettleMs);
+    }
+
+    /// <summary>
+    /// Milliseconds from <paramref name="startMs"/> to <paramref name="nowMs"/>,
+    /// correct across the U32 timestamp wrap. Negative values mean "not yet".
+    /// </summary>
+    private static long ElapsedMs(uint startMs, uint nowMs)
+    {
+        uint delta = unchecked(nowMs - startMs);
+        return delta > int.MaxValue ? -(long)(uint.MaxValue - delta) - 1 : delta;
+    }
+
     private int BucketIndex(float rpm)
     {
         int idx = (int)(rpm / BucketRpm);
         return Math.Min(idx, _powerByBucket.Length - 1);
-    }
-
-    /// <summary>
-    /// True when the pull started low enough that boost/power had settled
-    /// before the samples were taken. See <see cref="PullStartMaxFraction"/>.
-    /// </summary>
-    private bool IsFullRangePull() =>
-        _pendingStartRpm <= _maxRpm * PullStartMaxFraction;
-
-    private void CommitPull()
-    {
-        foreach (int idx in _pendingBuckets)
-        {
-            _powerByBucket[idx] = _pendingByBucket[idx];
-        }
-
-        for (int gear = 1; gear < GearSlots; gear++)
-        {
-            if ((_pendingGearMask & (1 << gear)) != 0)
-            {
-                _pullsByGear[gear]++;
-            }
-        }
-
-        RecalculateMaxPower();
-        _dirty = true;
-        _version++;
     }
 
     private void RecalculateMaxPower()
@@ -325,25 +314,5 @@ public sealed class PowerCurveTracker
                 _maxPowerRpm = Math.Min(_maxRpm, idx * BucketRpm + BucketRpm / 2f);
             }
         }
-    }
-
-    private void ClearPull()
-    {
-        if (_pendingByBucket.Length != _powerByBucket.Length)
-        {
-            _pendingByBucket = new float[_powerByBucket.Length];
-        }
-        else
-        {
-            foreach (int idx in _pendingBuckets)
-            {
-                _pendingByBucket[idx] = 0f;
-            }
-        }
-
-        _pendingBuckets.Clear();
-        _pendingSamples = 0;
-        _pendingGearMask = 0;
-        _pendingStartRpm = 0f;
     }
 }

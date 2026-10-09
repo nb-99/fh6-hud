@@ -114,8 +114,8 @@ public sealed class HudState : IDisposable
 
         if (!Live)
         {
-            // A pull must not span a menu or loading screen: commit what we have.
-            PowerCurve.EndPull();
+            // A full-throttle run must not span a menu or loading screen.
+            PowerCurve.EndRun();
             return; // timers hold: Update() is not called while there is no live data
         }
 
@@ -128,7 +128,7 @@ public sealed class HudState : IDisposable
         }
 
         PowerCurve.Configure(packet.EngineMaxRpm);
-        PowerCurve.AddPullSample(packet.CurrentEngineRpm, packet.PowerWatts, packet.Accel, packet.Gear);
+        PowerCurve.Observe(packet);
         GearRatios.AddSample(packet);
         ShiftAdvisor.Recalculate(packet.EngineMaxRpm);
 
