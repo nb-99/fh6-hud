@@ -31,6 +31,14 @@ public sealed class PowerCurveTracker
     /// </summary>
     public const int MinSamplesPerPull = 10;
 
+    /// <summary>
+    /// A pull may only replace stored data if it started at or below this
+    /// fraction of max RPM. A pull that begins higher (e.g. throttle reapplied
+    /// at speed after a lift) reads power while boost is still building, so its
+    /// values are too low and would overwrite a good full-range curve.
+    /// </summary>
+    public const float PullStartMaxFraction = 0.5f;
+
     private const int GearSlots = GearRatioTracker.MaxForwardGear + 1;
 
     private float[] _powerByBucket = Array.Empty<float>();
@@ -45,6 +53,7 @@ public sealed class PowerCurveTracker
     private readonly List<int> _pendingBuckets = new();
     private int _pendingSamples;
     private int _pendingGearMask;
+    private float _pendingStartRpm;
 
     // Committed pulls per forward gear (index = gear).
     private readonly int[] _pullsByGear = new int[GearSlots];
@@ -176,6 +185,11 @@ public sealed class PowerCurveTracker
             return;
         }
 
+        if (_pendingSamples == 0)
+        {
+            _pendingStartRpm = rpm;
+        }
+
         int idx = BucketIndex(rpm);
         if (!(powerW > _pendingByBucket[idx]))
         {
@@ -210,7 +224,7 @@ public sealed class PowerCurveTracker
             return;
         }
 
-        if (_pendingSamples >= MinSamplesPerPull)
+        if (_pendingSamples >= MinSamplesPerPull && IsFullRangePull())
         {
             CommitPull();
         }
@@ -272,6 +286,13 @@ public sealed class PowerCurveTracker
         return Math.Min(idx, _powerByBucket.Length - 1);
     }
 
+    /// <summary>
+    /// True when the pull started low enough that boost/power had settled
+    /// before the samples were taken. See <see cref="PullStartMaxFraction"/>.
+    /// </summary>
+    private bool IsFullRangePull() =>
+        _pendingStartRpm <= _maxRpm * PullStartMaxFraction;
+
     private void CommitPull()
     {
         foreach (int idx in _pendingBuckets)
@@ -323,5 +344,6 @@ public sealed class PowerCurveTracker
         _pendingBuckets.Clear();
         _pendingSamples = 0;
         _pendingGearMask = 0;
+        _pendingStartRpm = 0f;
     }
 }

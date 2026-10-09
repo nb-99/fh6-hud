@@ -185,6 +185,39 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
+    public void PullStartedHighInTheRange_DoesNotOverwriteAGoodCurve()
+    {
+        // Good full pull from low RPM, then a lift and throttle reapplied at
+        // 5000 RPM while boost is still building: its low readings must not
+        // replace the stored curve at 5000 RPM.
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+
+        FeedPull(tracker, 1500f, 150_000f);
+        FeedPull(tracker, 5000f, 400_000f);
+        ReleaseThrottle(tracker);
+
+        FeedPull(tracker, 5000f, 200_000f);
+        ReleaseThrottle(tracker);
+
+        Assert.Equal(400_000f, tracker.Buckets[50]);
+        Assert.Equal(400_000f, tracker.MaxPowerW);
+    }
+
+    [Fact]
+    public void PullStartedInTheLowerRange_StillCommits()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+
+        // Starts at 3500 RPM, exactly PullStartMaxFraction of 7000.
+        FeedPull(tracker, 3500f, 250_000f);
+        ReleaseThrottle(tracker);
+
+        Assert.Equal(250_000f, tracker.Buckets[35]);
+    }
+
+    [Fact]
     public void ShortPull_IsDiscarded()
     {
         // One-frame throttle taps must not overwrite the curve.
