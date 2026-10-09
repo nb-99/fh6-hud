@@ -31,8 +31,9 @@ interval timers, engine/power data, and shift cues over the game window.
   advice never bounces you off the rev limiter or into an immediate
   upshift/downshift loop — a little less power in the higher gear beats
   hitting the limiter. The engine title shows the learned point
-  ("SHIFT @ 6400"), "SHIFT LEARNING" while the current gear is still being
-  learned, and "SHIFT --" in the top gear, neutral, or reverse. The cue is a
+  ("SHIFT @ 6400"), "SHIFT LEARNING · n PULLS" while the current gear is still
+  being learned (n = full-throttle pulls that have covered that gear), and
+  "SHIFT --" in the top gear, neutral, or reverse. The cue is a
   separate centered panel that can be dragged into the driver's field of view
   and shows a `SHIFT CUE` placeholder while editing. It self-calibrates per
   car after a few full-throttle pulls — no car database. If the car pulls
@@ -220,14 +221,18 @@ docs/fh6-data-out.md        official FH6 Data Out spec snapshot
   raw values; the HUD converts them to °C. The optimal range depends on the
   compound you select.
 - **Power curve is empty** — it fills in while driving; do a full-throttle
-  pull through the rev range. The curve resets when you switch cars.
+  pull through the rev range and lift off the throttle. A pull is committed
+  when the throttle is released (pulls shorter than ~10 frames are ignored),
+  so the curve updates after each pull rather than during it. Each new pull
+  replaces the values it reached, so a one-off power spike is overwritten by the
+  next normal pull. The curve resets when you switch cars.
 - **Shift indicator stays "SHIFT LEARNING" / no lights** — the advisor needs
   both the power curve and the gear ratios to be learned: do a few full-throttle
   pulls through the gears (one pull through every gear is enough; the engine
   panel learns gear ratios as rpm-per-speed while you drive with the clutch
   fully engaged and no wheelspin). It also needs the next gear's post-shift
   rev range to have been sampled — i.e. you must actually drive each gear.
-  The engine title reads `SHIFT LEARNING` while the current gear has not
+  The engine title reads `SHIFT LEARNING · n PULLS` while the current gear has not
   produced a shift point yet, and stays `SHIFT --` only where no point can
   ever exist: the top gear, neutral, and reverse. Everything resets when you
   switch cars. If the power curve keeps falling after its peak, the upshift
