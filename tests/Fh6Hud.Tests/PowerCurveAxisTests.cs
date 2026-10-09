@@ -88,6 +88,76 @@ public class PowerCurveAxisTests
     }
 
     [Fact]
+    public void FindPowerBand_SpansTheContiguousRangeAroundThePeak()
+    {
+        // 7000 RPM redline = 71 buckets. Buckets 57..62 are within 95% of the
+        // 100-unit peak at bucket 60; the rest of the curve is well below.
+        var buckets = Enumerable.Repeat(50f, 71).ToArray();
+        for (int i = 57; i <= 62; i++)
+        {
+            buckets[i] = 96f;
+        }
+
+        buckets[60] = 100f;
+
+        var band = PowerCurveAxis.FindPowerBand(buckets, 100, 7000);
+
+        Assert.Equal(new PowerCurveAxis.PowerBand(5700, 6300), band);
+    }
+
+    [Fact]
+    public void FindPowerBand_StopsAtTheFirstBucketBelowThreshold()
+    {
+        // Bucket 61 is 94 (< 95% of 100), so the band ends at bucket 60 even
+        // though bucket 62 is above the threshold again.
+        var buckets = new float[71];
+        buckets[59] = 96f;
+        buckets[60] = 100f;
+        buckets[61] = 94f;
+        buckets[62] = 99f;
+
+        var band = PowerCurveAxis.FindPowerBand(buckets, 100, 7000);
+
+        Assert.Equal(new PowerCurveAxis.PowerBand(5900, 6100), band);
+    }
+
+    [Fact]
+    public void FindPowerBand_ClampsTheUpperEdgeToRedline()
+    {
+        var buckets = new float[71];
+        buckets[69] = 96f;
+        buckets[70] = 100f;
+
+        var band = PowerCurveAxis.FindPowerBand(buckets, 100, 7000);
+
+        Assert.Equal(new PowerCurveAxis.PowerBand(6900, 7000), band);
+    }
+
+    [Fact]
+    public void FindPowerBand_SinglePeakBucketIsOneBucketWide()
+    {
+        var buckets = new float[71];
+        buckets[40] = 100f;
+
+        var band = PowerCurveAxis.FindPowerBand(buckets, 100, 7000);
+
+        Assert.Equal(new PowerCurveAxis.PowerBand(4000, 4100), band);
+    }
+
+    [Fact]
+    public void FindPowerBand_NullWithoutPowerData()
+    {
+        Assert.Null(PowerCurveAxis.FindPowerBand(new float[71], 100, 7000));
+        Assert.Null(PowerCurveAxis.FindPowerBand(Array.Empty<float>(), 100, 7000));
+    }
+
+    [Fact]
+    public void PowerBandLabel_ShowsThresholdAndRange()
+    {
+        Assert.Equal("95%+ 5700–6300", PowerCurveAxis.PowerBandLabel(new PowerCurveAxis.PowerBand(5700, 6300)));
+    }
+
+    [Fact]
     public void PowerTicks_EmptyWithoutPower()
     {
         Assert.Empty(PowerCurveAxis.PowerTicks(0, 88));

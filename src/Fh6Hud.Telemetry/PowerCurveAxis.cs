@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 namespace Fh6Hud.Telemetry;
 
@@ -27,6 +28,71 @@ public static class PowerCurveAxis
 
     /// <summary>A horizontal grid line labelled in PS.</summary>
     public readonly record struct PowerTick(double Y, string Label);
+
+    /// <summary>
+    /// Fraction of peak power that defines the power band. 95% is a
+    /// practical "flat-top" threshold: the RPM range where the engine is
+    /// within 5% of its best power.
+    /// </summary>
+    public const double PowerBandFraction = 0.95;
+
+    /// <summary>RPM range where power stays at or above the band fraction of peak.</summary>
+    [StructLayout(LayoutKind.Auto)]
+    public readonly record struct PowerBand(double LowRpm, double HighRpm);
+
+    /// <summary>
+    /// The contiguous RPM range around the peak bucket where power is at least
+    /// <paramref name="fraction"/> of the peak. Edges are bucket boundaries, so
+    /// the band is quantised to <paramref name="bucketRpm"/> (a band
+    /// "5700–6300" means buckets 5700 through 6299). Null while there is no
+    /// power data.
+    /// </summary>
+    public static PowerBand? FindPowerBand(
+        IReadOnlyList<float> buckets,
+        double bucketRpm,
+        double maxRpm,
+        double fraction = PowerBandFraction)
+    {
+        if (buckets.Count == 0 || maxRpm <= 0)
+        {
+            return null;
+        }
+
+        int peak = 0;
+        for (int i = 1; i < buckets.Count; i++)
+        {
+            if (buckets[i] > buckets[peak])
+            {
+                peak = i;
+            }
+        }
+
+        if (buckets[peak] <= 0)
+        {
+            return null;
+        }
+
+        double threshold = buckets[peak] * fraction;
+        int low = peak;
+        int high = peak;
+        while (low > 0 && buckets[low - 1] >= threshold)
+        {
+            low--;
+        }
+
+        while (high < buckets.Count - 1 && buckets[high + 1] >= threshold)
+        {
+            high++;
+        }
+
+        // The last bucket may extend past the redline; clamp to it.
+        return new PowerBand(low * bucketRpm, Math.Min(maxRpm, (high + 1) * bucketRpm));
+    }
+
+    /// <summary>Label shown on the band, e.g. "95%+ 5700–6300".</summary>
+    public static string PowerBandLabel(PowerBand band, double fraction = PowerBandFraction) =>
+        $"{fraction * 100:F0}%+ {band.LowRpm.ToString("F0", CultureInfo.InvariantCulture)}–"
+        + $"{band.HighRpm.ToString("F0", CultureInfo.InvariantCulture)}";
 
     /// <summary>
     /// X coordinate for an RPM value across a canvas of the given width. The

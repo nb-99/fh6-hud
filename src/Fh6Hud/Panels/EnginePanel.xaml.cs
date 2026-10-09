@@ -28,6 +28,7 @@ public partial class EnginePanel : PanelWindow
     private double _gridHeight = -1;
     private float _gridMaxRpm = -1;
     private float _gridMaxPowerW = -1;
+    private int _gridCurveVersion = -1;
 
     public EnginePanel(HudState state)
         : base(state, PanelKeys.Engine)
@@ -147,7 +148,9 @@ public partial class EnginePanel : PanelWindow
         float maxRpm = State.PowerCurve.MaxRpm;
         float maxPower = State.PowerCurve.MaxPowerW;
 
-        if (w == _gridWidth && h == _gridHeight && maxRpm == _gridMaxRpm && maxPower == _gridMaxPowerW)
+        int curveVersion = State.PowerCurve.Version;
+        if (w == _gridWidth && h == _gridHeight && maxRpm == _gridMaxRpm && maxPower == _gridMaxPowerW
+            && curveVersion == _gridCurveVersion)
         {
             return;
         }
@@ -156,6 +159,7 @@ public partial class EnginePanel : PanelWindow
         _gridHeight = h;
         _gridMaxRpm = maxRpm;
         _gridMaxPowerW = maxPower;
+        _gridCurveVersion = curveVersion;
 
         PowerCurveGrid.Children.Clear();
         PowerCurveAxisLabels.Children.Clear();
@@ -164,8 +168,45 @@ public partial class EnginePanel : PanelWindow
             return;
         }
 
+        // The band goes first so the grid lines and labels draw over it.
+        AddPowerBand(maxRpm, w, h);
         AddRpmGrid(maxRpm, w, h);
         AddPowerGrid(maxPower, w, h);
+    }
+
+    /// <summary>
+    /// Shades the RPM range where power is within 5% of peak and labels it
+    /// (e.g. "95%+ 5700–6300"), so "where is my max power" reads at a glance.
+    /// </summary>
+    private void AddPowerBand(float maxRpm, double w, double h)
+    {
+        var band = PowerCurveAxis.FindPowerBand(
+            State.PowerCurve.Buckets, PowerCurveTracker.BucketRpm, maxRpm);
+        if (band is not { } b)
+        {
+            return;
+        }
+
+        double x1 = PowerCurveAxis.XForRpm(b.LowRpm, maxRpm, w);
+        double x2 = PowerCurveAxis.XForRpm(b.HighRpm, maxRpm, w);
+        var shade = new Rectangle
+        {
+            Width = Math.Max(0, x2 - x1),
+            Height = h,
+            Fill = _accentBrush,
+            Opacity = 0.14,
+        };
+        Canvas.SetLeft(shade, x1);
+        PowerCurveGrid.Children.Add(shade);
+
+        // Label at the bottom of the band: the high-power area is at the top,
+        // so the bottom is usually free of curve.
+        var text = CreateAxisLabel(PowerCurveAxis.PowerBandLabel(b));
+        text.Foreground = _accentBrush;
+        text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Canvas.SetLeft(text, Math.Clamp(x1 + 3, 0, Math.Max(0, w - text.DesiredSize.Width)));
+        Canvas.SetTop(text, Math.Max(0, h - text.DesiredSize.Height - 1));
+        PowerCurveGrid.Children.Add(text);
     }
 
     private void AddRpmGrid(float maxRpm, double w, double h)
