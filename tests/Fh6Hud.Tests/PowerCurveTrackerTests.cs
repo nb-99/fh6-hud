@@ -248,6 +248,45 @@ public class PowerCurveTrackerTests
     }
 
     [Fact]
+    public void PowerAt_ReturnsSampledBucketValue()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        tracker.AddSample(2000f, 100_000f);
+
+        Assert.Equal(100_000f, tracker.PowerAt(2000f));
+        // Past the last sampled bucket there is no data to interpolate toward.
+        Assert.Equal(0f, tracker.PowerAt(2050f));
+    }
+
+    [Fact]
+    public void PowerAt_BridgesAnUnsampledBucket_InsteadOfReadingZero()
+    {
+        // Bucket 21 was never sampled. It must not read as 0 W (the chart dip
+        // and the shift advisor's dip both came from that).
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        tracker.AddSample(2000f, 100_000f);
+        tracker.AddSample(2200f, 120_000f);
+
+        Assert.Equal(0f, tracker.Buckets[21]);
+        Assert.Equal(110_000f, tracker.PowerAt(2100f), 3);
+        Assert.Equal(105_000f, tracker.PowerAt(2050f), 3);
+    }
+
+    [Fact]
+    public void PowerAt_IsZeroOutsideTheSampledSpan()
+    {
+        var tracker = new PowerCurveTracker();
+        tracker.Configure(7000f);
+        tracker.AddSample(2000f, 100_000f);
+        tracker.AddSample(2200f, 120_000f);
+
+        Assert.Equal(0f, tracker.PowerAt(1000f));
+        Assert.Equal(0f, tracker.PowerAt(5000f));
+    }
+
+    [Fact]
     public void WattsToPs_Converts()
     {
         Assert.Equal(1f, PowerCurveTracker.WattsToPs(735.49875f), 4);

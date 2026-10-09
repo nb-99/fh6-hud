@@ -218,6 +218,52 @@ public sealed class PowerCurveTracker
         ClearPull();
     }
 
+    /// <summary>
+    /// Power at an RPM, interpolated between the nearest sampled buckets on
+    /// either side. A bucket with no sample (value 0) is unknown, not zero
+    /// power: it is bridged rather than read as a dip. Returns 0 below the
+    /// first sampled bucket and above the last one, where there is no data.
+    /// </summary>
+    public float PowerAt(float rpm)
+    {
+        int len = _powerByBucket.Length;
+        if (len == 0 || rpm < 0f)
+        {
+            return 0f;
+        }
+
+        float position = Math.Min(rpm / BucketRpm, len - 1);
+        int lower = (int)position;
+        while (lower >= 0 && _powerByBucket[lower] <= 0f)
+        {
+            lower--;
+        }
+
+        if (lower < 0)
+        {
+            return 0f;
+        }
+
+        if (position - lower <= 0f)
+        {
+            return _powerByBucket[lower];
+        }
+
+        int upper = lower + 1;
+        while (upper < len && _powerByBucket[upper] <= 0f)
+        {
+            upper++;
+        }
+
+        if (upper >= len)
+        {
+            return 0f;
+        }
+
+        float fraction = (position - lower) / (upper - lower);
+        return _powerByBucket[lower] + (_powerByBucket[upper] - _powerByBucket[lower]) * fraction;
+    }
+
     public static float WattsToPs(float watts) => watts / WattsPerPs;
 
     private int BucketIndex(float rpm)

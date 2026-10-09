@@ -131,10 +131,17 @@ public partial class EnginePanel : PanelWindow
 
         // Same RPM->x transform as the axis grid and the power dot, so a
         // point at, say, 6000 RPM sits exactly on the 6k grid line.
+        // Unsampled buckets (0) are skipped, so the line bridges the gap
+        // instead of dropping to the baseline.
         var points = new PointCollection();
         float maxRpm = State.PowerCurve.MaxRpm;
         for (int i = 0; i <= lastSampled; i++)
         {
+            if (buckets[i] <= 0)
+            {
+                continue;
+            }
+
             double x = PowerCurveAxis.XForRpm(i * PowerCurveTracker.BucketRpm, maxRpm, w);
             double y = PowerCurveAxis.YForPower(buckets[i], maxPower, h);
             points.Add(new Point(x, y));
