@@ -262,25 +262,8 @@ public sealed class ShiftPointAdvisor
         return maxRpm; // no crossover: redline is optimal for this gear
     }
 
-    /// <summary>Bucket-interpolated power at an RPM; 0 where the curve has no samples.</summary>
-    private float PowerAt(float rpm)
-    {
-        var buckets = _curve.Buckets;
-        if (buckets.Count == 0 || rpm < 0f)
-        {
-            return 0f;
-        }
-
-        float position = rpm / PowerCurveTracker.BucketRpm;
-        int lower = (int)position;
-        if (lower >= buckets.Count - 1)
-        {
-            return buckets[^1];
-        }
-
-        float fraction = position - lower;
-        return buckets[lower] + (buckets[lower + 1] - buckets[lower]) * fraction;
-    }
+    /// <summary>Power at an RPM across unsampled gaps; 0 where the curve has no data.</summary>
+    private float PowerAt(float rpm) => _curve.PowerAt(rpm);
 
     private float PeakPowerRpm()
     {

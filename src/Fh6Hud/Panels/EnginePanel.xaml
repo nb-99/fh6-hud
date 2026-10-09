@@ -71,6 +71,8 @@
                     Margin="0,14,0,0"
                     ClipToBounds="True"
                     HorizontalAlignment="Stretch">
+                <!-- Axis grid: rebuilt in code-behind, drawn beneath the curve. -->
+                <Canvas x:Name="PowerCurveGrid"/>
                 <Polyline x:Name="PowerCurveLine"
                           Stroke="{StaticResource AccentBrush}"
                           StrokeThickness="1.5"/>
@@ -78,8 +80,15 @@
                          Width="6"
                          Height="6"
                          Fill="{StaticResource TimingBrush}"
-                         Visibility="Collapsed"/>
+                          Visibility="Collapsed"/>
             </Canvas>
+
+            <!-- RPM axis labels, placed under the curve in code-behind. Not
+                 clipped, so the labels at the edges can overhang slightly. -->
+            <Canvas x:Name="PowerCurveAxisLabels"
+                    Height="12"
+                    Margin="0,2,0,0"/>
+
 
             <Grid Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>

@@ -826,12 +826,19 @@ public sealed class PanelWindowDragTests
     {
         const float maxRpm = 7000f;
         state.PowerCurve.Configure(maxRpm);
-        for (float rpm = 25f; rpm <= maxRpm; rpm += 25f)
+
+        // One sample per 100 RPM bucket at that bucket's peak power, so the
+        // bucket's value equals the curve's peak regardless of how the curve
+        // aggregates repeated samples.
+        for (float bucketStart = 0f; bucketStart <= maxRpm; bucketStart += 100f)
         {
-            float power = rpm <= 5000f
-                ? 120_000f + (rpm - 1000f) * 45f
-                : 300_000f - (rpm - 5000f) * 30f;
-            state.PowerCurve.AddSample(rpm, power);
+            float peak = 0f;
+            for (float rpm = bucketStart; rpm < bucketStart + 100f && rpm <= maxRpm; rpm += 25f)
+            {
+                peak = Math.Max(peak, SyntheticPower(rpm));
+            }
+
+            state.PowerCurve.AddSample(bucketStart, peak);
         }
 
         SeedGearRatio(state.GearRatios, gear: 1, rpm: 6000f, speedMs: 20f);
@@ -839,6 +846,11 @@ public sealed class PanelWindowDragTests
         SeedGearRatio(state.GearRatios, gear: 3, rpm: 6000f, speedMs: 40f);
         state.ShiftAdvisor.Recalculate(maxRpm);
     }
+
+    private static float SyntheticPower(float rpm) =>
+        rpm <= 5000f
+            ? 120_000f + (rpm - 1000f) * 45f
+            : 300_000f - (rpm - 5000f) * 30f;
 
     private static void SetLiveState(HudState state, Fh6Packet packet, bool live = true)
     {

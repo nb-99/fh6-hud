@@ -114,6 +114,8 @@ public sealed class HudState : IDisposable
 
         if (!Live)
         {
+            // A full-throttle run must not span a menu or loading screen.
+            PowerCurve.EndRun();
             return; // timers hold: Update() is not called while there is no live data
         }
 
@@ -126,7 +128,7 @@ public sealed class HudState : IDisposable
         }
 
         PowerCurve.Configure(packet.EngineMaxRpm);
-        PowerCurve.AddSample(packet.CurrentEngineRpm, packet.PowerWatts);
+        PowerCurve.Observe(packet);
         GearRatios.AddSample(packet);
         ShiftAdvisor.Recalculate(packet.EngineMaxRpm);
 

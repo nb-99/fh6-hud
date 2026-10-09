@@ -219,8 +219,12 @@ docs/fh6-data-out.md        official FH6 Data Out spec snapshot
 - **Tire temps look wrong** — FH6 sends tire temperature as Fahrenheit-like
   raw values; the HUD converts them to °C. The optimal range depends on the
   compound you select.
-- **Power curve is empty** — it fills in while driving; do a full-throttle
-  pull through the rev range. The curve resets when you switch cars.
+- **Power curve is empty** — it fills in live while you drive at full throttle.
+  After a long lift, the first second of renewed throttle is not recorded while
+  boost builds; a gear change does not wait. Each 100 RPM bucket shows the median
+  of its last five full-throttle readings, so a single spike or dip at a shift
+  does not show up as a dip in the curve, while a real change such as a detune
+  takes over within a few passes. The curve resets when you switch cars.
 - **Shift indicator stays "SHIFT LEARNING" / no lights** — the advisor needs
   both the power curve and the gear ratios to be learned: do a few full-throttle
   pulls through the gears (one pull through every gear is enough; the engine
